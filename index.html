@@ -10,6 +10,7 @@
 <title>Train</title>
 <link rel="manifest" href="manifest.json">
 <link rel="apple-touch-icon" href="icon.svg">
+<script src="https://accounts.google.com/gsi/client" async defer onload="initGIS()"></script>
 <style>
 *{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
 :root{
@@ -99,6 +100,8 @@ nav button.active::after{content:'';position:absolute;bottom:0;left:24px;right:2
 .plan-ex span:last-child{color:var(--muted);font-size:11px;text-align:right;flex-shrink:0}
 .plan-tag{display:inline-block;font-size:10px;font-weight:600;padding:1px 6px;border-radius:4px;margin-left:6px;vertical-align:middle}
 .plan-tag.new{background:var(--blue-bg);color:var(--blue)}
+.plan-tag.skill{background:var(--amber-bg);color:var(--amber)}
+.ex-locked{opacity:.55}
 
 .action-btn{width:100%;padding:13px;background:var(--surface);border:1.5px solid var(--border);color:var(--text);font-family:inherit;font-size:13px;font-weight:600;border-radius:10px;cursor:pointer;margin-top:10px;transition:background .15s}
 .action-btn:active{background:var(--bg)}
@@ -145,10 +148,12 @@ nav button.active::after{content:'';position:absolute;bottom:0;left:24px;right:2
     <button class="active" onclick="showPage('today',this)">Today</button>
     <button onclick="showPage('log',this)">Log</button>
     <button onclick="showPage('plan',this)">Plan</button>
+    <button onclick="showPage('settings',this)">Settings</button>
   </nav>
   <div id="today" class="page active"></div>
   <div id="log" class="page"></div>
   <div id="plan" class="page"></div>
+  <div id="settings" class="page"></div>
   <button id="btn-finish" onclick="finishSession()" disabled>Start session to unlock</button>
 </div>
 <script>
@@ -215,57 +220,69 @@ const PLAN = {
     }
   },
   p2:{
-    label:'Phase 2',sub:'Aug–Sep · full body + explosive',
+    label:'Phase 2',sub:'Tue/Thu/Sat · skill + strength',
     sessions:{
       'Session A':[
-        {section:'Core first',name:'Dead bug',meta:'3×12',load:'BW',sets:3,muscle:'core',type:'strength'},
-        {name:'Hollow body hold',meta:'3×25 sec',load:'BW',sets:3,muscle:'core',type:'strength'},
-        {section:'Pull + squat',name:'Pull-ups',meta:'5×5 strength + 2×8 hypertrophy',load:'BW → +5 kg vest',sets:7,muscle:'back',type:'strength'},
-        {name:'Barbell squat',meta:'5×5 @ 60 kg + 2×10 @ 50 kg',load:'50–60 kg',sets:7,muscle:'legs',type:'strength'},
-        {name:'Aussie pull-ups',meta:'4×12 · feet elevated version',load:'BW',sets:4,muscle:'back',type:'strength'},
-        {name:'Single-arm DB row',meta:'4×10 each · heavier than P1',load:'14–16 kg',sets:8,muscle:'back',type:'strength',note:'new'},
-        {section:'Calf + wrist',name:'Single-leg calf raise',meta:'3×15 · 3 sec down off step — keep this forever',load:'BW',sets:6,muscle:'calves',type:'rehab',note:'new'},
-        {name:'Farmer carry',meta:'3×40 m · builds wrist stability',load:'16–18 kg each',sets:3,muscle:'grip',type:'strength',note:'new'},
-        {section:'Explosive',name:'Jump squat',meta:'4×6 · max height, track knees over toes',load:'BW',sets:4,muscle:'legs',type:'explosive'},
-        {name:'Lateral bounds',meta:'3×8 each side · stick landing 1 sec',load:'BW',sets:6,muscle:'legs',type:'explosive'},
+        {section:'Core',name:'Dead bug',meta:'3×12 · lower back flat',load:'BW',sets:3,muscle:'core',type:'strength'},
+        {name:'Hollow hold',meta:'3×25s · lower back pressed down',load:'BW',sets:3,muscle:'core',type:'strength'},
+        {section:'Skill',name:'Tuck front lever',meta:'5×8s · stop 2s before form breaks',load:'BW',sets:5,muscle:'back',type:'skill',holdSec:8},
+        {name:'Tuck L-sit',meta:'5×12s · stop 2s before form breaks',load:'BW',sets:5,muscle:'core',type:'skill',holdSec:12},
+        {section:'Strength',name:'Pull-ups',meta:'4×5 + 1×8',load:'BW',sets:5,muscle:'back',type:'strength'},
+        {name:'Barbell squat',meta:'3×5 @ 60 kg + 1×10 @ 50 kg',load:'50–60 kg',sets:4,muscle:'legs',type:'strength'},
+        {name:'Aussie rows (feet elevated)',meta:'4×12',load:'BW',sets:4,muscle:'back',type:'strength'},
+        {name:'Standing calf raise',meta:'3×20 · 3s down',load:'20 kg',sets:3,muscle:'calves',type:'strength'},
+        {section:'Explosive',name:'Jump squat',meta:'4×6 · max height',load:'BW',sets:4,muscle:'legs',type:'explosive'},
       ],
       'Session B':[
-        {section:'Core first',name:'Plank',meta:'3×40 sec',load:'BW',sets:3,muscle:'core',type:'strength'},
-        {name:'Side plank',meta:'3×25 sec each side',load:'BW',sets:6,muscle:'core',type:'strength'},
-        {section:'Push + hinge',name:'Body dips',meta:'5×5 strength + 2×10 hypertrophy',load:'BW → +5 kg vest',sets:7,muscle:'chest',type:'strength'},
-        {name:'DB Romanian deadlift',meta:'4×12 · or barbell 60 kg',load:'17–20 kg each',sets:4,muscle:'hamstrings',type:'strength'},
-        {name:'Push-ups',meta:'4×12 · progress to archer when 3×15 easy',load:'BW',sets:4,muscle:'chest',type:'strength'},
-        {name:'DB shoulder press',meta:'4×10 · smash chain starts here',load:'10–12 kg each',sets:4,muscle:'shoulders',type:'strength',note:'new'},
+        {section:'Core',name:'Plank',meta:'3×40s',load:'BW',sets:3,muscle:'core',type:'strength'},
+        {name:'Side plank',meta:'3×25s each side',load:'BW',sets:6,muscle:'core',type:'strength'},
+        {section:'Skill',name:'Pike push-up',meta:'4×8 · controlled',load:'BW',sets:4,muscle:'shoulders',type:'strength'},
+        {name:'Support hold',meta:'4×15s · top of dip position',load:'BW',sets:4,muscle:'chest',type:'skill',holdSec:15},
+        {section:'Strength',name:'Dips (fists/handles)',meta:'4×5 + 1×10',load:'BW',sets:5,muscle:'chest',type:'strength'},
+        {name:'DB Romanian deadlift',meta:'4×10',load:'17–20 kg each',sets:4,muscle:'hamstrings',type:'strength'},
+        {name:'Push-ups',meta:'4×12',load:'BW',sets:4,muscle:'chest',type:'strength'},
+        {name:'Lateral raise',meta:'3×15 · light, slow',load:'5–7 kg',sets:3,muscle:'shoulders',type:'strength'},
         {name:'Bulgarian split squat',meta:'3×10 each',load:'12–14 kg each',sets:6,muscle:'legs',type:'strength'},
-        {name:'Band pull-apart',meta:'3×20 · keep permanently for trap health',load:'light band',sets:3,muscle:'upper back',type:'rehab',note:'new'},
-        {section:'Explosive',name:'Split squat jump',meta:'3×6 each · lunge position, switch legs mid-air',load:'BW',sets:6,muscle:'legs',type:'explosive'},
-        {name:'Broad jump',meta:'3×5',load:'BW',sets:3,muscle:'legs',type:'explosive'},
+        {section:'Explosive',name:'Split squat jump',meta:'3×6 each · switch legs mid-air',load:'BW',sets:6,muscle:'legs',type:'explosive'},
       ],
       'Session C':[
-        {section:'Full body accessory',name:'Aussie pull-ups',meta:'4×15 · add plate when easy',load:'BW + plate',sets:4,muscle:'back',type:'strength'},
-        {name:'Pike push-ups',meta:'4×10 · smash shoulder preparation',load:'BW',sets:4,muscle:'shoulders',type:'strength'},
-        {name:'DB lateral raise',meta:'3×15 · light, slow — rear delt health',load:'5–6 kg each',sets:3,muscle:'shoulders',type:'strength',note:'new'},
-        {name:'Goblet squat',meta:'3×15 · 4 sec down',load:'24 kg',sets:3,muscle:'legs',type:'strength'},
-        {name:'Single-leg RDL',meta:'3×10 each · balance + hamstring',load:'10–12 kg',sets:6,muscle:'hamstrings',type:'strength'},
-        {name:'Single-leg calf raise',meta:'3×15 each · permanent fixture',load:'BW',sets:6,muscle:'calves',type:'rehab',note:'new'},
-        {section:'Explosive',name:'Box jumps',meta:'4×5 · step down, never jump down',load:'BW',sets:4,muscle:'legs',type:'explosive'},
-        {name:'Rotational medicine ball throw',meta:'3×8 each side · builds smash rotation',load:'4–5 kg ball',sets:6,muscle:'core',type:'explosive',note:'new'},
+        {section:'Skill practice',name:'Tuck front lever',meta:'4×8s · no grind',load:'BW',sets:4,muscle:'back',type:'skill',holdSec:8},
+        {name:'Tuck L-sit',meta:'4×12s · no grind',load:'BW',sets:4,muscle:'core',type:'skill',holdSec:12},
+        {name:'Wall handstand',meta:'3×20s · wrist must be 100%',load:'BW',sets:3,muscle:'shoulders',type:'skill',holdSec:20,wristGated:true},
+        {section:'Light full body',name:'Goblet squat (slow)',meta:'3×12 · 4s down',load:'20 kg',sets:3,muscle:'legs',type:'strength'},
+        {name:'Aussie rows',meta:'3×12',load:'BW',sets:3,muscle:'back',type:'strength'},
+        {name:'Push-ups',meta:'3×12',load:'BW',sets:3,muscle:'chest',type:'strength'},
+        {section:'Agility',name:'Lateral bounds',meta:'3×8 each · stick landing 1s',load:'BW',sets:6,muscle:'legs',type:'explosive'},
+        {name:'Box jumps',meta:'3×5 · step down, never jump down',load:'BW',sets:3,muscle:'legs',type:'explosive'},
       ]
     }
   }
 };
 
+let SHEETS_CLIENT_ID=localStorage.getItem('train_gid')||'';
+let SHEETS_SPREADSHEET_ID=localStorage.getItem('train_gsid')||'';
+
 const MOBILITY=['90/90 hip stretch — 2 min each side','Hamstring stretch (posterior pelvic tilt) — 2 min','Single-leg calf raise off step, 3 sec down — 3×15 each','Toe doming standing — 2 min','Thoracic rotation seated — 10 each side'];
 
 const PROGRESSION=[
-  {name:'Pull-ups',rule:'BW → +5 kg vest → +10 kg → archer pull-up',trigger:'3×8 clean for 2 sessions'},
-  {name:'Body dips',rule:'BW → +5 kg → +10 kg → ring dips',trigger:'3×10 clean for 2 sessions'},
-  {name:'Push-ups',rule:'Standard → archer → pike → pseudo planche',trigger:'3×15 clean for 2 sessions'},
-  {name:'Barbell squat',rule:'60 kg → 65 kg → 70 kg → 80 kg (5 kg jumps)',trigger:'5×5 solid for 2 sessions'},
-  {name:'DB RDL',rule:'17 kg → 20 kg → 22 kg each hand',trigger:'4×12 clean for 2 sessions'},
-  {name:'Farmer carry',rule:'14 kg → 16 kg → 18 kg → 20 kg each',trigger:'3×40 m easy for 2 sessions'},
-  {name:'DB shoulder press',rule:'10 kg → 12 kg → 14 kg each',trigger:'4×10 clean for 2 sessions'},
+  {name:'Pull-ups',rule:'BW → +5 kg → +10 kg → archer → one-arm',trigger:'4×8 clean for 2 sessions'},
+  {name:'Dips',rule:'BW → +5 kg → +10 kg → ring dips',trigger:'3×10 clean for 2 sessions'},
+  {name:'Push-ups',rule:'Standard → archer → pseudo planche',trigger:'3×15 clean for 2 sessions'},
+  {name:'Aussie rows',rule:'Feet flat → feet elevated → weighted → one-arm',trigger:'4×12 clean for 2 sessions'},
+  {name:'Barbell squat',rule:'60 → 65 → 70 → 75 → 80 kg (5 kg jumps)',trigger:'5×5 solid for 2 sessions'},
+  {name:'DB RDL',rule:'17 → 20 → 22 kg each hand',trigger:'4×10 easy for 2 sessions'},
+  {name:'Bulgarian split squat',rule:'12 → 14 → 16 kg each',trigger:'3×10 clean for 2 sessions'},
+  {name:'Standing calf raise',rule:'20 → 24 → 28 kg',trigger:'3×20 clean for 2 sessions'},
+  {name:'Lateral raise',rule:'5 → 7 → 9 kg',trigger:'3×15 clean for 2 sessions'},
   {name:'Jump squat',rule:'BW → +5 kg vest → +10 kg vest',trigger:'4×6 controlled for 2 sessions'},
+  {name:'Goblet squat',rule:'20 → 24 → 28 kg',trigger:'3×12 clean for 2 sessions'},
+];
+
+const SKILL_PROGRESSIONS=[
+  {name:'L-sit',rungs:['Tuck hold — 5×10s','Tuck longer — 5×15s','Advanced tuck — 5×12s','One-leg extended — 5×10s each','Full L-sit — 5×10s']},
+  {name:'Front lever',rungs:['Scap pull-ups (prereq) — 4×8','Tuck FL — 5×8s','Tuck FL longer — 5×12s','Advanced tuck — 5×8s','One-leg FL — 5×8s each','Straddle FL — 5×5s']},
+  {name:'HSPU (pike path)',rungs:['Pike push-up, feet on floor — 4×8','Feet on low box — 4×6','Feet on high box — 4×6','Wall HSPU negatives — 4×3','Wall HSPU full — 4×5']},
+  {name:'Handstand',rungs:['Wall walks — 3×3','Chest-to-wall hold — 3×20s','Free balance kicks — 3×5','Free handstand — 3×10s'],gated:'wrist'},
 ];
 
 let state=JSON.parse(localStorage.getItem('train_state')||'{}');
@@ -275,6 +292,96 @@ let currentPhase=state.phase||'p1';
 let currentSession=state.session||'Monday';
 let setsDone={};
 let sessionStart=null;
+let wristUnlocked=JSON.parse(localStorage.getItem('train_wrist')||'false');
+let activeTimer=null;
+let gisToken=null;
+let tokenClient=null;
+
+function initGIS(){
+  if(!SHEETS_CLIENT_ID||!window.google) return;
+  tokenClient=google.accounts.oauth2.initTokenClient({
+    client_id:SHEETS_CLIENT_ID,
+    scope:'https://www.googleapis.com/auth/spreadsheets',
+    callback:(resp)=>{
+      if(resp.error) return;
+      gisToken=resp.access_token;
+      localStorage.setItem('train_signin','1');
+      pullFromSheets().then(()=>{renderLog();renderSettings();});
+    }
+  });
+  if(localStorage.getItem('train_signin')==='1') tokenClient.requestAccessToken({prompt:''});
+}
+
+function signIn(){if(tokenClient) tokenClient.requestAccessToken({prompt:''})}
+function signOut(){
+  if(gisToken) google.accounts.oauth2.revoke(gisToken);
+  gisToken=null;
+  localStorage.removeItem('train_signin');
+  renderLog();renderSettings();
+}
+
+function sessionToRows(e){
+  return e.exercises.map(ex=>[
+    e.id, e.date, e.phaseLabel, e.session, e.completionPct, e.durationMin||'',
+    ex.name, ex.muscle, ex.type, ex.load, ex.setsCompleted, ex.setsTarget
+  ]);
+}
+function rowsToSession(rows){
+  const r=rows[0];
+  return{
+    id:Number(r[0]),date:r[1],phase:r[2].toLowerCase().replace(' ','').slice(0,2),phaseLabel:r[2],session:r[3],
+    completionPct:Number(r[4]),durationMin:r[5]?Number(r[5]):null,
+    totalSets:rows.reduce((a,x)=>a+Number(x[11]),0),
+    completedSets:rows.reduce((a,x)=>a+Number(x[10]),0),
+    exercises:rows.map(x=>({name:x[6],muscle:x[7],type:x[8],load:x[9],setsCompleted:Number(x[10]),setsTarget:Number(x[11])})),
+    synced:true
+  };
+}
+
+async function sheetsAppend(rows){
+  if(!gisToken||!SHEETS_SPREADSHEET_ID) return false;
+  try{
+    const r=await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${SHEETS_SPREADSHEET_ID}/values/Log!A1:append?valueInputOption=RAW&insertDataOption=INSERT_ROWS`,{
+      method:'POST',
+      headers:{Authorization:`Bearer ${gisToken}`,'Content-Type':'application/json'},
+      body:JSON.stringify({values:rows})
+    });
+    return r.ok;
+  }catch{return false;}
+}
+
+async function pullFromSheets(){
+  if(!gisToken||!SHEETS_SPREADSHEET_ID) return;
+  try{
+    const r=await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${SHEETS_SPREADSHEET_ID}/values/Log!A:L`,{headers:{Authorization:`Bearer ${gisToken}`}});
+    if(!r.ok) return;
+    const data=await r.json();
+    const rows=(data.values||[]).slice(1).filter(r=>r.length>=11);
+    const grouped={};
+    rows.forEach(row=>{grouped[row[0]]=grouped[row[0]]||[];grouped[row[0]].push(row);});
+    const log=JSON.parse(localStorage.getItem('train_log')||'[]');
+    const ids=new Set(log.map(e=>e.id));
+    const cutoff=Date.now()-28*24*60*60*1000;
+    Object.values(grouped).forEach(sessionRows=>{
+      const entry=rowsToSession(sessionRows);
+      if(!ids.has(entry.id)&&new Date(entry.date).getTime()>cutoff){log.push(entry);ids.add(entry.id);}
+    });
+    log.sort((a,b)=>b.id-a.id);
+    localStorage.setItem('train_log',JSON.stringify(log));
+  }catch{}
+}
+
+async function syncUnsynced(){
+  if(!gisToken){signIn();return;}
+  const log=JSON.parse(localStorage.getItem('train_log')||'[]');
+  const pending=log.filter(e=>!e.synced);
+  for(const entry of pending){
+    const ok=await sheetsAppend(sessionToRows(entry));
+    if(ok) entry.synced=true;
+  }
+  localStorage.setItem('train_log',JSON.stringify(log));
+  renderLog();
+}
 
 function switchPhase(p){currentPhase=p;const sessions=Object.keys(PLAN[p].sessions);currentSession=sessions[0];setsDone={};warmupDone={};sessionStart=null;save();renderToday()}
 
@@ -319,7 +426,7 @@ function renderToday(){
   let html=`<div class="date-header"><div class="day">${getDateStr()}</div><div class="sub">50 min · phone in bag</div></div>
   <div class="phase-toggle">
     <button class="phase-btn${currentPhase==='p1'?' active':''}" onclick="switchPhase('p1')">Phase 1 <span style="font-weight:400;opacity:.7">Jun–Jul</span></button>
-    <button class="phase-btn${currentPhase==='p2'?' active':''}" onclick="switchPhase('p2')">Phase 2 <span style="font-weight:400;opacity:.7">Aug–Sep</span></button>
+    <button class="phase-btn${currentPhase==='p2'?' active':''}" onclick="switchPhase('p2')">Phase 2 <span style="font-weight:400;opacity:.7">Tue/Thu/Sat</span></button>
   </div>
   ${suggested!==currentSession?`<div class="next-badge"><span class="nb-label">Suggested:</span>${suggested}<button onclick="selectSession('${suggested}')" style="margin-left:auto;padding:4px 10px;border:1px solid var(--blue-border);border-radius:6px;background:var(--surface);color:var(--blue);font-family:inherit;font-size:11px;font-weight:600;cursor:pointer">Switch</button></div>`:''}
   <div class="session-picker">`;
@@ -363,22 +470,33 @@ function renderToday(){
       html+=`<div class="section-label">${ex.section}</div>`;
       lastSection=ex.section;
     }
-    const done=setsDone[i]&&setsDone[i].filter(Boolean).length===ex.sets;
-    html+=`<div class="ex-item">
+    const locked=ex.wristGated&&!wristUnlocked;
+    const done=!locked&&setsDone[i]&&setsDone[i].filter(Boolean).length===ex.sets;
+    const isSkill=ex.type==='skill';
+    html+=`<div class="ex-item${locked?' ex-locked':''}">
       <div class="ex-header" onclick="toggleSets(${i})">
         <div class="ex-check${done?' done':''}" id="chk-${i}">
           <svg width="11" height="11" viewBox="0 0 11 11" fill="none"><path d="M1.5 5.5l3 3 5-5" stroke="#fff" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
         </div>
         <div class="ex-info">
-          <div class="ex-name">${ex.name}${ex.note==='new'?'<span class="plan-tag new">new</span>':''}</div>
+          <div class="ex-name">${ex.name}${isSkill?'<span class="plan-tag skill">skill</span>':''}${locked?' 🔒':''}</div>
           <div class="ex-meta">${ex.meta}</div>
         </div>
         <div class="ex-load">${ex.load}</div>
       </div>
       <div class="ex-sets" id="sets-${i}">`;
-    for(let s=0;s<ex.sets;s++){
-      const d=setsDone[i]&&setsDone[i][s];
-      html+=`<button class="set-btn${d?' done':''}" onclick="toggleSet(${i},${s},this)">set ${s+1}</button>`;
+    if(locked){
+      html+=`<button class="set-btn" style="width:100%;color:var(--amber)" onclick="unlockWrist();event.stopPropagation()">Wrist is 100% — unlock handstand</button>`;
+    } else if(isSkill&&ex.holdSec){
+      for(let s=0;s<ex.sets;s++){
+        const d=setsDone[i]&&setsDone[i][s];
+        html+=`<button class="set-btn${d?' done':''}" id="stbtn-${i}-${s}" onclick="handleSetClick(${i},${s},this,${ex.holdSec})">${d?'set '+(s+1):'hold '+ex.holdSec+'s'}</button>`;
+      }
+    } else {
+      for(let s=0;s<ex.sets;s++){
+        const d=setsDone[i]&&setsDone[i][s];
+        html+=`<button class="set-btn${d?' done':''}" onclick="toggleSet(${i},${s},this)">set ${s+1}</button>`;
+      }
     }
     html+=`</div></div>`;
   });
@@ -388,6 +506,42 @@ function renderToday(){
 }
 
 function toggleSets(i){document.getElementById('sets-'+i).classList.toggle('open')}
+
+function handleSetClick(exIdx,setIdx,btn,holdSec){
+  if(btn.classList.contains('done')){toggleSet(exIdx,setIdx,btn);btn.textContent='hold '+holdSec+'s';return}
+  if(activeTimer&&activeTimer.exIdx===exIdx&&activeTimer.setIdx===setIdx){
+    clearInterval(activeTimer.interval);activeTimer=null;
+    btn.textContent='hold '+holdSec+'s';return;
+  }
+  if(activeTimer){
+    clearInterval(activeTimer.interval);
+    const prev=document.getElementById('stbtn-'+activeTimer.exIdx+'-'+activeTimer.setIdx);
+    const prevEx=PLAN[currentPhase].sessions[currentSession][activeTimer.exIdx];
+    if(prev&&!prev.classList.contains('done')) prev.textContent='hold '+(prevEx.holdSec)+'s';
+    activeTimer=null;
+  }
+  let remaining=holdSec;
+  btn.textContent=remaining+'s';
+  const interval=setInterval(()=>{
+    remaining--;
+    const b=document.getElementById('stbtn-'+exIdx+'-'+setIdx);
+    if(!b){clearInterval(interval);activeTimer=null;return}
+    if(remaining<=0){
+      clearInterval(interval);activeTimer=null;
+      toggleSet(exIdx,setIdx,b);
+      b.textContent='set '+(setIdx+1);
+    } else {
+      b.textContent=remaining+'s';
+    }
+  },1000);
+  activeTimer={exIdx,setIdx,interval};
+}
+
+function unlockWrist(){
+  wristUnlocked=!wristUnlocked;
+  localStorage.setItem('train_wrist',JSON.stringify(wristUnlocked));
+  renderToday();
+}
 
 function toggleSet(exIdx,setIdx,btn){
   if(!setsDone[exIdx]) setsDone[exIdx]=[];
@@ -430,8 +584,15 @@ function finishSession(){
     completedSets:Object.values(setsDone).flat().filter(Boolean).length,
     completionPct:Math.round(Object.values(setsDone).flat().filter(Boolean).length/exercises.reduce((a,e)=>a+e.sets,0)*100)
   };
+  entry.synced=false;
   log.unshift(entry);
   localStorage.setItem('train_log',JSON.stringify(log));
+  if(gisToken) sheetsAppend(sessionToRows(entry)).then(ok=>{
+    if(!ok) return;
+    const l=JSON.parse(localStorage.getItem('train_log')||'[]');
+    const i=l.findIndex(e=>e.id===entry.id);
+    if(i!==-1){l[i].synced=true;localStorage.setItem('train_log',JSON.stringify(l));}
+  });
   setsDone={};sessionStart=null;
   renderToday();renderLog();
   showPage('log',document.querySelectorAll('nav button')[1]);
@@ -446,7 +607,13 @@ function calcStreak(log){
 function renderLog(){
   const log=JSON.parse(localStorage.getItem('train_log')||'[]');
   const el=document.getElementById('log');
-  if(!log.length){el.innerHTML='<div class="empty-state">No sessions logged yet.<br>Complete your first workout.</div>';return}
+  const sheetsEnabled=!!SHEETS_CLIENT_ID;
+  const unsyncedCount=log.filter(e=>!e.synced).length;
+  if(!log.length){
+    let empty='<div class="empty-state">No sessions logged yet.<br>Complete your first workout.</div>';
+    if(sheetsEnabled) empty+=`<button class="action-btn" onclick="${gisToken?'syncUnsynced()':'signIn()'}">Connect Google Sheets</button>`;
+    el.innerHTML=empty;return;
+  }
   const avgCompletion=Math.round(log.reduce((a,e)=>a+e.completionPct,0)/log.length);
   const streak=calcStreak(log);
   let html=`<div class="stat-row">
@@ -454,14 +621,25 @@ function renderLog(){
     <div class="stat"><div class="stat-val">${streak}</div><div class="stat-label">wk streak</div></div>
     <div class="stat"><div class="stat-val">${avgCompletion}%</div><div class="stat-label">avg done</div></div>
   </div>`;
+  if(sheetsEnabled){
+    if(gisToken){
+      html+=`<div style="display:flex;gap:8px;margin-bottom:14px">
+        <button class="action-btn" style="margin-top:0;flex:1" onclick="syncUnsynced()">${unsyncedCount>0?'Sync '+unsyncedCount+' unsynced':'Sheets synced ✓'}</button>
+        <button onclick="signOut()" style="padding:13px 14px;border:1.5px solid var(--border);border-radius:10px;background:var(--surface);color:var(--muted);font-family:inherit;font-size:12px;font-weight:600;cursor:pointer;flex-shrink:0">Disconnect</button>
+      </div>`;
+    } else {
+      html+=`<button class="action-btn" style="margin-bottom:14px" onclick="signIn()">Connect Google Sheets</button>`;
+    }
+  }
   log.forEach(entry=>{
     const d=new Date(entry.date);
     const dateStr=d.toLocaleDateString('en-AU',{weekday:'short',day:'numeric',month:'short'});
     const timeStr=d.toLocaleTimeString('en-AU',{hour:'2-digit',minute:'2-digit'});
     const durStr=entry.durationMin?` · ${entry.durationMin} min`:'';
     const full=entry.completionPct===100;
+    const syncDot=sheetsEnabled&&!entry.synced?'<span style="display:inline-block;width:6px;height:6px;border-radius:50%;background:var(--amber);margin-left:6px;vertical-align:middle" title="not synced"></span>':'';
     html+=`<div class="log-entry">
-      <div class="log-date">${dateStr} · ${timeStr}${durStr}</div>
+      <div class="log-date">${dateStr} · ${timeStr}${durStr}${syncDot}</div>
       <div class="log-session">${entry.session} · ${entry.phaseLabel}<span class="log-pct ${full?'full':'partial'}">${entry.completionPct}%</span></div>
       <div class="log-exercises">`;
     entry.exercises.forEach(ex=>{
@@ -471,7 +649,7 @@ function renderLog(){
     html+=`</div></div>`;
   });
   html+=`<button class="action-btn" onclick="exportCSV()">Export as CSV</button>
-  <button class="action-btn" onclick="exportJSON()">Export backup (JSON) — save to iCloud</button>
+  <button class="action-btn" onclick="exportJSON()">Export backup (JSON)</button>
   <button class="action-btn" onclick="document.getElementById('import-input').click()">Import backup (JSON)</button>`;
   el.innerHTML=html;
 }
@@ -485,6 +663,44 @@ function exportCSV(){
   const blob=new Blob([csv],{type:'text/csv'});
   const url=URL.createObjectURL(blob);
   const a=document.createElement('a');a.href=url;a.download='train_log.csv';a.click();URL.revokeObjectURL(url);
+}
+
+function saveSettings(){
+  const cid=document.getElementById('inp-cid').value.trim();
+  const sid=document.getElementById('inp-sid').value.trim();
+  SHEETS_CLIENT_ID=cid;
+  SHEETS_SPREADSHEET_ID=sid;
+  localStorage.setItem('train_gid',cid);
+  localStorage.setItem('train_gsid',sid);
+  gisToken=null;
+  tokenClient=null;
+  initGIS();
+  renderSettings();
+}
+
+function renderSettings(){
+  const connected=!!gisToken;
+  const configured=!!(SHEETS_CLIENT_ID&&SHEETS_SPREADSHEET_ID);
+  document.getElementById('settings').innerHTML=`
+    <div class="date-header" style="margin-bottom:20px"><div class="day">Settings</div></div>
+    <div class="section-label">Google Sheets sync</div>
+    <div style="display:flex;flex-direction:column;gap:10px;margin-bottom:16px">
+      <div>
+        <div style="font-size:11px;color:var(--muted);margin-bottom:4px;font-weight:500">OAuth Client ID</div>
+        <input id="inp-cid" type="text" value="${SHEETS_CLIENT_ID}" placeholder="xxxx.apps.googleusercontent.com"
+          style="width:100%;padding:11px 12px;border:1.5px solid var(--border);border-radius:10px;font-family:inherit;font-size:12px;background:var(--surface);color:var(--text);outline:none">
+      </div>
+      <div>
+        <div style="font-size:11px;color:var(--muted);margin-bottom:4px;font-weight:500">Spreadsheet ID</div>
+        <input id="inp-sid" type="text" value="${SHEETS_SPREADSHEET_ID}" placeholder="from the sheet URL"
+          style="width:100%;padding:11px 12px;border:1.5px solid var(--border);border-radius:10px;font-family:inherit;font-size:12px;background:var(--surface);color:var(--text);outline:none">
+      </div>
+    </div>
+    <button class="action-btn" onclick="saveSettings()" style="margin-bottom:10px">Save</button>
+    ${configured?`<button class="action-btn" onclick="${connected?'signOut()':'signIn()'}">${connected?'Disconnect Google account':'Connect Google account'}</button>`:''}
+    ${configured&&connected?`<p style="font-size:12px;color:var(--green);margin-top:10px;text-align:center">Connected ✓</p>`:''}
+    ${configured&&!connected?`<p style="font-size:12px;color:var(--muted);margin-top:10px;text-align:center">Credentials saved — tap Connect to sign in</p>`:''}
+  `;
 }
 
 function renderPlan(){
@@ -505,9 +721,14 @@ function renderPlan(){
     ${MOBILITY.map(m=>`<div class="plan-ex"><span>${m}</span><span>10 min total</span></div>`).join('')}
   </div>
   <div style="margin-top:24px;padding-top:20px;border-top:1px solid var(--border)">
-    <div class="plan-phase">Progression rules</div>
-    <p style="font-size:12px;color:var(--muted);margin-bottom:12px;line-height:1.6">If you hit all reps clean for 2 sessions in a row → move to next level. Write date + reps in your phone notes.</p>
+    <div class="plan-phase">Strength progressions</div>
+    <p style="font-size:12px;color:var(--muted);margin-bottom:12px;line-height:1.6">Hit the trigger for 2 sessions in a row → move up one rung.</p>
     ${PROGRESSION.map(p=>`<div class="prog-card"><div class="prog-card-title">${p.name}</div><div class="prog-rule">→ ${p.rule}</div><div class="prog-rule">Trigger: <strong>${p.trigger}</strong></div></div>`).join('')}
+  </div>
+  <div style="margin-top:24px;padding-top:20px;border-top:1px solid var(--border)">
+    <div class="plan-phase">Skill progressions · 8-week base build</div>
+    <p style="font-size:12px;color:var(--muted);margin-bottom:12px;line-height:1.6">Never to failure — stop 2s before form breaks. Advance rung when target is clean for 2 sessions in a row.</p>
+    ${SKILL_PROGRESSIONS.map(sp=>`<div class="prog-card"><div class="prog-card-title">${sp.name}${sp.gated?'<span style="font-size:10px;color:var(--amber);margin-left:6px">🔒 wrist-gated</span>':''}</div>${sp.rungs.map((r,i)=>`<div class="prog-rule"><strong>${i+1}.</strong> ${r}</div>`).join('')}</div>`).join('')}
   </div>
   <button class="action-btn" onclick="window.print()">Print full plan</button>`;
   document.getElementById('plan').innerHTML=html;
@@ -552,7 +773,7 @@ document.getElementById('import-input').addEventListener('change',function(e){
   this.value='';
 });
 
-renderToday();renderLog();renderPlan();
+renderToday();renderLog();renderPlan();renderSettings();
 document.getElementById('btn-finish').style.display='block';
 if('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js');
 </script>
