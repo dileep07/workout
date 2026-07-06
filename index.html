@@ -411,20 +411,26 @@ async function pullFromSheets(){
     const rows=(data.values||[]).slice(1).filter(r=>r.length>=11);
     const grouped={};
     rows.forEach(row=>{grouped[row[0]]=grouped[row[0]]||[];grouped[row[0]].push(row);});
-    const log=JSON.parse(localStorage.getItem('train_log')||'[]');
-    const ids=new Set(log.map(e=>e.id));
+    const sheetIds=new Set(Object.keys(grouped).map(Number));
     const cutoff=Date.now()-28*24*60*60*1000;
+    let log=JSON.parse(localStorage.getItem('train_log')||'[]');
+    // remove sessions that were synced but deleted from Sheets
+    log=log.filter(e=>!e.synced||sheetIds.has(e.id)||new Date(e.date).getTime()<=cutoff);
+    // add sessions from Sheets not in local
+    const localIds=new Set(log.map(e=>e.id));
     Object.values(grouped).forEach(sessionRows=>{
       const entry=rowsToSession(sessionRows);
-      if(!ids.has(entry.id)&&new Date(entry.date).getTime()>cutoff){log.push(entry);ids.add(entry.id);}
+      if(!localIds.has(entry.id)&&new Date(entry.date).getTime()>cutoff){log.push(entry);localIds.add(entry.id);}
     });
     log.sort((a,b)=>b.id-a.id);
     localStorage.setItem('train_log',JSON.stringify(log));
   }catch{}
 }
 
+let syncing=false;
 async function syncUnsynced(){
   if(!gisToken){signIn();return;}
+  syncing=true;renderLog();
   await pullFromSheets();
   const log=JSON.parse(localStorage.getItem('train_log')||'[]');
   const pending=log.filter(e=>!e.synced);
@@ -433,7 +439,7 @@ async function syncUnsynced(){
     if(ok) entry.synced=true;
   }
   localStorage.setItem('train_log',JSON.stringify(log));
-  renderLog();
+  syncing=false;renderLog();
 }
 
 function switchPhase(p){currentPhase=p;const sessions=Object.keys(PLAN[p].sessions);currentSession=sessions[0];setsDone={};warmupDone={};sessionStart=null;save();renderToday()}
@@ -715,7 +721,9 @@ function renderLog(){
   if(sheetsEnabled){
     if(gisToken){
       html+=`<div style="display:flex;gap:8px;margin-bottom:14px">
-        <button class="action-btn" style="margin-top:0;flex:1" onclick="syncUnsynced()">${unsyncedCount>0?'Sync '+unsyncedCount+' unsynced':'Sheets synced ✓'}</button>
+        <button class="action-btn" style="margin-top:0;flex:1" onclick="syncUnsynced()" ${syncing?'disabled':''}>
+          ${syncing?'Syncing…':unsyncedCount>0?'Sync '+unsyncedCount+' unsynced':'Synced ✓'}
+        </button>
         <button onclick="signOut()" style="padding:13px 14px;border:1.5px solid var(--border);border-radius:10px;background:var(--surface);color:var(--muted);font-family:inherit;font-size:12px;font-weight:600;cursor:pointer;flex-shrink:0">Disconnect</button>
       </div>`;
     } else {
