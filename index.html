@@ -102,6 +102,11 @@ nav button.active::after{content:'';position:absolute;bottom:0;left:24px;right:2
 .plan-tag.new{background:var(--blue-bg);color:var(--blue)}
 .plan-tag.skill{background:var(--amber-bg);color:var(--amber)}
 .ex-locked{opacity:.55}
+.ex-load-tap{cursor:pointer;user-select:none}
+.ex-load-tap::after{content:' ›';opacity:.5}
+.prog-picker{padding:8px 14px 10px 14px;display:flex;flex-wrap:wrap;gap:6px;border-top:1px solid var(--border)}
+.prog-rung{padding:6px 12px;border:1.5px solid var(--border);border-radius:8px;background:var(--bg);color:var(--muted);font-family:inherit;font-size:11px;font-weight:500;cursor:pointer;transition:all .15s}
+.prog-rung.active{border-color:var(--blue-border);color:var(--blue);background:var(--blue-bg)}
 
 .action-btn{width:100%;padding:13px;background:var(--surface);border:1.5px solid var(--border);color:var(--text);font-family:inherit;font-size:13px;font-weight:600;border-radius:10px;cursor:pointer;margin-top:10px;transition:background .15s}
 .action-btn:active{background:var(--bg)}
@@ -265,18 +270,20 @@ let SHEETS_SPREADSHEET_ID=localStorage.getItem('train_gsid')||'';
 const MOBILITY=['90/90 hip stretch — 2 min each side','Hamstring stretch (posterior pelvic tilt) — 2 min','Single-leg calf raise off step, 3 sec down — 3×15 each','Toe doming standing — 2 min','Thoracic rotation seated — 10 each side'];
 
 const PROGRESSION=[
-  {name:'Pull-ups',rule:'BW → +5 kg → +10 kg → archer → one-arm',trigger:'4×8 clean for 2 sessions'},
-  {name:'Dips',rule:'BW → +5 kg → +10 kg → ring dips',trigger:'3×10 clean for 2 sessions'},
-  {name:'Push-ups',rule:'Standard → archer → pseudo planche',trigger:'3×15 clean for 2 sessions'},
-  {name:'Aussie rows',rule:'Feet flat → feet elevated → weighted → one-arm',trigger:'4×12 clean for 2 sessions'},
-  {name:'Barbell squat',rule:'60 → 65 → 70 → 75 → 80 kg (5 kg jumps)',trigger:'5×5 solid for 2 sessions'},
-  {name:'DB RDL',rule:'17 → 20 → 22 kg each hand',trigger:'4×10 easy for 2 sessions'},
-  {name:'Bulgarian split squat',rule:'12 → 14 → 16 kg each',trigger:'3×10 clean for 2 sessions'},
-  {name:'Standing calf raise',rule:'20 → 24 → 28 kg',trigger:'3×20 clean for 2 sessions'},
-  {name:'Lateral raise',rule:'5 → 7 → 9 kg',trigger:'3×15 clean for 2 sessions'},
-  {name:'Jump squat',rule:'BW → +5 kg vest → +10 kg vest',trigger:'4×6 controlled for 2 sessions'},
-  {name:'Goblet squat',rule:'20 → 24 → 28 kg',trigger:'3×12 clean for 2 sessions'},
+  {name:'Pull-ups',loads:['BW','+5 kg','+10 kg','archer','one-arm'],trigger:'4×8 clean for 2 sessions'},
+  {name:'Dips (fists/handles)',loads:['BW','+5 kg','+10 kg','ring dips'],trigger:'3×10 clean for 2 sessions'},
+  {name:'Push-ups',loads:['standard','archer','pseudo planche'],trigger:'3×15 clean for 2 sessions'},
+  {name:'Aussie rows (feet elevated)',loads:['feet flat','feet elevated','weighted','one-arm'],trigger:'4×12 clean for 2 sessions'},
+  {name:'Aussie rows',loads:['feet flat','feet elevated','weighted','one-arm'],trigger:'4×12 clean for 2 sessions'},
+  {name:'Barbell squat',loads:['60 kg','65 kg','70 kg','75 kg','80 kg'],trigger:'5×5 solid for 2 sessions'},
+  {name:'DB Romanian deadlift',loads:['17 kg each','20 kg each','22 kg each'],trigger:'4×10 easy for 2 sessions'},
+  {name:'Bulgarian split squat',loads:['12 kg each','14 kg each','16 kg each'],trigger:'3×10 clean for 2 sessions'},
+  {name:'Standing calf raise',loads:['20 kg','24 kg','28 kg'],trigger:'3×20 clean for 2 sessions'},
+  {name:'Lateral raise',loads:['5 kg','7 kg','9 kg'],trigger:'3×15 clean for 2 sessions'},
+  {name:'Jump squat',loads:['BW','+5 kg vest','+10 kg vest'],trigger:'4×6 controlled for 2 sessions'},
+  {name:'Goblet squat (slow)',loads:['20 kg','24 kg','28 kg'],trigger:'3×12 clean for 2 sessions'},
 ];
+const PROG_MAP=Object.fromEntries(PROGRESSION.map(p=>[p.name,p]));
 
 const SKILL_PROGRESSIONS=[
   {name:'L-sit',rungs:['Tuck hold — 5×10s','Tuck longer — 5×15s','Advanced tuck — 5×12s','One-leg extended — 5×10s each','Full L-sit — 5×10s']},
@@ -296,6 +303,21 @@ let wristUnlocked=JSON.parse(localStorage.getItem('train_wrist')||'false');
 let activeTimer=null;
 let gisToken=null;
 let tokenClient=null;
+let progState=JSON.parse(localStorage.getItem('train_progression')||'{}');
+let progPickerOpen=null;
+
+function getProgLoad(exName,fallback){
+  const p=PROG_MAP[exName];if(!p) return fallback;
+  const rung=progState[exName]||0;
+  return p.loads[Math.min(rung,p.loads.length-1)];
+}
+function toggleProgPicker(name){progPickerOpen=progPickerOpen===name?null:name;renderToday();}
+function selectProgRung(name,idx){
+  progState[name]=idx;
+  localStorage.setItem('train_progression',JSON.stringify(progState));
+  progPickerOpen=null;
+  renderToday();
+}
 
 function initGIS(){
   if(!SHEETS_CLIENT_ID||!window.google) return;
@@ -473,6 +495,9 @@ function renderToday(){
     const locked=ex.wristGated&&!wristUnlocked;
     const done=!locked&&setsDone[i]&&setsDone[i].filter(Boolean).length===ex.sets;
     const isSkill=ex.type==='skill';
+    const inProg=!!PROG_MAP[ex.name];
+    const currentLoad=getProgLoad(ex.name,ex.load);
+    const pickerOpen=progPickerOpen===ex.name;
     html+=`<div class="ex-item${locked?' ex-locked':''}">
       <div class="ex-header" onclick="toggleSets(${i})">
         <div class="ex-check${done?' done':''}" id="chk-${i}">
@@ -482,8 +507,11 @@ function renderToday(){
           <div class="ex-name">${ex.name}${isSkill?'<span class="plan-tag skill">skill</span>':''}${locked?' 🔒':''}</div>
           <div class="ex-meta">${ex.meta}</div>
         </div>
-        <div class="ex-load">${ex.load}</div>
+        <div class="ex-load${inProg?' ex-load-tap':''}" ${inProg?`onclick="toggleProgPicker('${ex.name}');event.stopPropagation()"`:''}>
+          ${currentLoad}
+        </div>
       </div>
+      ${inProg&&pickerOpen?`<div class="prog-picker">${PROG_MAP[ex.name].loads.map((l,ri)=>`<button class="prog-rung${(progState[ex.name]||0)===ri?' active':''}" onclick="selectProgRung('${ex.name}',${ri})">${l}</button>`).join('')}</div>`:''}
       <div class="ex-sets" id="sets-${i}">`;
     if(locked){
       html+=`<button class="set-btn" style="width:100%;color:var(--amber)" onclick="unlockWrist();event.stopPropagation()">Wrist is 100% — unlock handstand</button>`;
@@ -723,7 +751,7 @@ function renderPlan(){
   <div style="margin-top:24px;padding-top:20px;border-top:1px solid var(--border)">
     <div class="plan-phase">Strength progressions</div>
     <p style="font-size:12px;color:var(--muted);margin-bottom:12px;line-height:1.6">Hit the trigger for 2 sessions in a row → move up one rung.</p>
-    ${PROGRESSION.map(p=>`<div class="prog-card"><div class="prog-card-title">${p.name}</div><div class="prog-rule">→ ${p.rule}</div><div class="prog-rule">Trigger: <strong>${p.trigger}</strong></div></div>`).join('')}
+    ${PROGRESSION.map(p=>{const rung=progState[p.name]||0;return`<div class="prog-card"><div class="prog-card-title">${p.name}</div><div class="prog-rule">${p.loads.map((l,i)=>`<span style="color:${i===rung?'var(--blue)':'var(--muted)'};font-weight:${i===rung?'700':'400'}">${l}</span>`).join(' → ')}</div><div class="prog-rule">Trigger: <strong>${p.trigger}</strong></div></div>`}).join('')}
   </div>
   <div style="margin-top:24px;padding-top:20px;border-top:1px solid var(--border)">
     <div class="plan-phase">Skill progressions · 8-week base build</div>
