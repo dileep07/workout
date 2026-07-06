@@ -425,6 +425,7 @@ async function pullFromSheets(){
 
 async function syncUnsynced(){
   if(!gisToken){signIn();return;}
+  await pullFromSheets();
   const log=JSON.parse(localStorage.getItem('train_log')||'[]');
   const pending=log.filter(e=>!e.synced);
   for(const entry of pending){
