@@ -82,15 +82,26 @@ nav button.active::after{content:'';position:absolute;bottom:0;left:24px;right:2
 .stat-val{font-size:24px;font-weight:700;letter-spacing:-.03em;color:var(--text)}
 .stat-label{font-size:10px;font-weight:500;color:var(--muted);margin-top:3px;text-transform:uppercase;letter-spacing:.05em}
 
-.log-entry{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:14px;margin-bottom:8px}
-.log-date{font-size:11px;color:var(--muted);margin-bottom:5px;font-weight:500}
-.log-session{font-size:14px;font-weight:700;margin-bottom:10px;display:flex;align-items:center;justify-content:space-between}
-.log-pct{font-size:12px;font-weight:600;padding:2px 8px;border-radius:6px}
+.log-entry{background:var(--surface);border:1px solid var(--border);border-radius:12px;margin-bottom:8px;overflow:hidden;cursor:pointer}
+.log-entry-header{padding:14px}
+.log-date{font-size:11px;color:var(--muted);margin-bottom:4px;font-weight:500;display:flex;align-items:center;gap:6px}
+.log-session{font-size:14px;font-weight:700;display:flex;align-items:center;justify-content:space-between}
+.log-pct{font-size:12px;font-weight:600;padding:2px 8px;border-radius:6px;flex-shrink:0}
 .log-pct.full{background:var(--green-bg);color:var(--green)}
 .log-pct.partial{background:var(--amber-bg);color:var(--amber)}
-.log-exercises{display:flex;flex-direction:column;gap:4px}
-.log-ex{display:flex;justify-content:space-between;font-size:12px;color:var(--muted)}
+.log-exercises{display:flex;flex-direction:column;gap:4px;padding:0 14px 14px;border-top:1px solid var(--border)}
+.log-ex{display:flex;justify-content:space-between;font-size:12px;color:var(--muted);padding:3px 0}
 .log-ex span:last-child{font-weight:600}
+.log-chevron{font-size:14px;color:var(--dim);margin-left:8px;transition:transform .2s;flex-shrink:0}
+.log-chevron.open{transform:rotate(180deg)}
+.cg-wrap{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:14px;margin-bottom:20px}
+.cg-title{font-size:10px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--dim);margin-bottom:12px;display:flex;justify-content:space-between}
+.cg-row{display:flex;align-items:center;gap:6px;margin-bottom:5px}
+.cg-row:last-child{margin-bottom:0}
+.cg-label{font-size:10px;color:var(--dim);width:40px;flex-shrink:0}
+.cg-dot{width:20px;height:20px;border-radius:50%;background:var(--border2);flex-shrink:0;transition:background .2s}
+.cg-dot.done{background:var(--green)}
+.cg-dot.cur{background:var(--border);border:2px dashed var(--border2)}
 .empty-state{text-align:center;padding:60px 20px;color:var(--muted);font-size:14px;line-height:2}
 
 .plan-phase{font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--amber);margin:24px 0 10px}
@@ -305,6 +316,7 @@ let gisToken=null;
 let tokenClient=null;
 let progState=JSON.parse(localStorage.getItem('train_progression')||'{}');
 let progPickerOpen=null;
+let expandedEntries=new Set();
 
 function getProgLoad(exName,fallback){
   const p=PROG_MAP[exName];if(!p) return fallback;
@@ -626,10 +638,41 @@ function finishSession(){
   showPage('log',document.querySelectorAll('nav button')[1]);
 }
 
+function getMondayKey(date){
+  const d=new Date(date);const day=d.getDay();
+  d.setDate(d.getDate()-(day===0?6:day-1));
+  return d.toISOString().slice(0,10);
+}
+function buildWeekGrid(log,weeks=12){
+  const wmap={};
+  log.forEach(e=>{const k=getMondayKey(e.date);wmap[k]=(wmap[k]||0)+1;});
+  const rows=[];const now=new Date();
+  for(let i=weeks-1;i>=0;i--){
+    const d=new Date(now);d.setDate(now.getDate()-i*7);
+    const k=getMondayKey(d);
+    const label=d.toLocaleDateString('en-AU',{day:'numeric',month:'short'});
+    rows.push({key:k,label,count:Math.min(wmap[k]||0,3),isCurrent:i===0});
+  }
+  return rows;
+}
 function calcStreak(log){
-  if(!log.length) return 0;
-  const weeks=new Set(log.map(e=>{const d=new Date(e.date);const jan=new Date(d.getFullYear(),0,1);return Math.ceil(((d-jan)/86400000+jan.getDay()+1)/7)+'_'+d.getFullYear()}));
-  return weeks.size;
+  const wmap={};
+  log.forEach(e=>{const k=getMondayKey(e.date);wmap[k]=(wmap[k]||0)+1;});
+  const curKey=getMondayKey(new Date());
+  let streak=0;const now=new Date();
+  for(let i=1;i<=52;i++){
+    const d=new Date(now);d.setDate(now.getDate()-i*7);
+    const k=getMondayKey(d);
+    if((wmap[k]||0)>=3) streak++;
+    else break;
+  }
+  if((wmap[curKey]||0)>=3) streak++;
+  return streak;
+}
+function toggleLogEntry(id){
+  if(expandedEntries.has(id)) expandedEntries.delete(id);
+  else expandedEntries.add(id);
+  renderLog();
 }
 
 function renderLog(){
@@ -659,22 +702,42 @@ function renderLog(){
       html+=`<button class="action-btn" style="margin-bottom:14px" onclick="signIn()">Connect Google Sheets</button>`;
     }
   }
+  const grid=buildWeekGrid(log);
+  html+=`<div class="cg-wrap">
+    <div class="cg-title"><span>Consistency · last 12 weeks</span><span style="color:var(--text)">${calcStreak(log)} week streak</span></div>
+    ${grid.map(w=>`<div class="cg-row">
+      <span class="cg-label">${w.label}</span>
+      ${[0,1,2].map(i=>`<span class="cg-dot${w.isCurrent&&i>=w.count?' cur':i<w.count?' done':''}"></span>`).join('')}
+    </div>`).join('')}
+  </div>`;
+
   log.forEach(entry=>{
     const d=new Date(entry.date);
     const dateStr=d.toLocaleDateString('en-AU',{weekday:'short',day:'numeric',month:'short'});
     const timeStr=d.toLocaleTimeString('en-AU',{hour:'2-digit',minute:'2-digit'});
-    const durStr=entry.durationMin?` · ${entry.durationMin} min`:'';
     const full=entry.completionPct===100;
-    const syncDot=sheetsEnabled&&!entry.synced?'<span style="display:inline-block;width:6px;height:6px;border-radius:50%;background:var(--amber);margin-left:6px;vertical-align:middle" title="not synced"></span>':'';
-    html+=`<div class="log-entry">
-      <div class="log-date">${dateStr} · ${timeStr}${durStr}${syncDot}</div>
-      <div class="log-session">${entry.session} · ${entry.phaseLabel}<span class="log-pct ${full?'full':'partial'}">${entry.completionPct}%</span></div>
-      <div class="log-exercises">`;
-    entry.exercises.forEach(ex=>{
-      const done=ex.setsCompleted===ex.setsTarget;
-      html+=`<div class="log-ex"><span>${ex.name}</span><span style="color:${done?'var(--green)':'var(--amber)'}">${ex.setsCompleted}/${ex.setsTarget} sets</span></div>`;
-    });
-    html+=`</div></div>`;
+    const expanded=expandedEntries.has(entry.id);
+    const syncDot=sheetsEnabled&&!entry.synced?'<span style="width:6px;height:6px;border-radius:50%;background:var(--amber);display:inline-block"></span>':'';
+    const durBadge=entry.durationMin?`<span style="background:var(--surface2);color:var(--muted);font-size:10px;font-weight:600;padding:2px 6px;border-radius:4px">${entry.durationMin} min</span>`:'';
+    html+=`<div class="log-entry" onclick="toggleLogEntry(${entry.id})">
+      <div class="log-entry-header">
+        <div class="log-date">${dateStr} · ${timeStr} ${durBadge} ${syncDot}</div>
+        <div class="log-session">${entry.session} · ${entry.phaseLabel}
+          <div style="display:flex;align-items:center;gap:6px">
+            <span class="log-pct ${full?'full':'partial'}">${entry.completionPct}%</span>
+            <span class="log-chevron${expanded?' open':''}">⌄</span>
+          </div>
+        </div>
+      </div>`;
+    if(expanded){
+      html+=`<div class="log-exercises">`;
+      entry.exercises.forEach(ex=>{
+        const done=ex.setsCompleted===ex.setsTarget;
+        html+=`<div class="log-ex"><span>${ex.name}<span style="color:var(--dim);font-size:10px;margin-left:6px">${ex.load}</span></span><span style="color:${done?'var(--green)':'var(--amber)'}">${ex.setsCompleted}/${ex.setsTarget}</span></div>`;
+      });
+      html+=`</div>`;
+    }
+    html+=`</div>`;
   });
   html+=`<button class="action-btn" onclick="exportCSV()">Export as CSV</button>
   <button class="action-btn" onclick="exportJSON()">Export backup (JSON)</button>
