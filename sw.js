@@ -1,4 +1,4 @@
-const CACHE = 'train-v8';
+const CACHE = 'train-v9';
 const ASSETS = [
   '/',
   '/index.html',
