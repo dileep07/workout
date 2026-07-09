@@ -318,10 +318,11 @@ const SKILL_EX_MAP={
 let state=JSON.parse(localStorage.getItem('train_state')||'{}');
 let warmupDone={};
 let warmupOpen=true;
-let currentPhase=state.phase||'p1';
+let currentPhase=PLAN[state.phase]?state.phase:'p1';
 let currentSession=state.session||'Monday';
 let setsDone={};
 let sessionStart=null;
+let editingLogId=null;
 let wristUnlocked=JSON.parse(localStorage.getItem('train_wrist')||'false');
 let activeTimer=null;
 let gisToken=null;
@@ -350,16 +351,96 @@ function selectProgRung(name,idx){
   renderToday();
 }
 
+const SHEET_HEADERS=['id','date','phase','session','completion_pct','duration_min','exercise','muscle','type','load','sets_completed','sets_target','warmup_completed','warmup_total'];
+
+function sessionToRows(e){
+  return e.exercises.map(ex=>[
+    e.id,e.date,e.phase,e.session,e.completionPct,e.durationMin??'',
+    ex.name,ex.muscle,ex.type,ex.load,ex.setsCompleted,ex.setsTarget,
+    e.warmupCompleted??0,e.warmupTotal??0
+  ]);
+}
+
+function rowsToSession(rows){
+  const r=rows[0];
+  const phase=PLAN[r[2]]?r[2]:'p1';
+  return{
+    id:Number(r[0]),date:r[1],phase,phaseLabel:PLAN[phase].label,session:r[3],
+    completionPct:Number(r[4]),durationMin:r[5]?Number(r[5]):null,
+    warmupCompleted:Number(r[12])||0,warmupTotal:Number(r[13])||0,
+    totalSets:rows.reduce((a,x)=>a+Number(x[11]),0),
+    completedSets:rows.reduce((a,x)=>a+Number(x[10]),0),
+    exercises:rows.map(x=>({name:x[6],muscle:x[7],type:x[8],load:x[9],setsCompleted:Number(x[10]),setsTarget:Number(x[11])})),
+    synced:true
+  };
+}
+
+async function sheetsGet(range){
+  const r=await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${SHEETS_SPREADSHEET_ID}/values/${range}`,{headers:{Authorization:`Bearer ${gisToken}`}});
+  return r.ok?r.json():null;
+}
+
+async function sheetsPut(range,values){
+  const r=await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${SHEETS_SPREADSHEET_ID}/values/${range}?valueInputOption=RAW`,{
+    method:'PUT',headers:{Authorization:`Bearer ${gisToken}`,'Content-Type':'application/json'},
+    body:JSON.stringify({values})
+  });
+  return r.ok;
+}
+
+async function sheetsAppend(rows){
+  if(!gisToken||!SHEETS_SPREADSHEET_ID) return false;
+  try{
+    const r=await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${SHEETS_SPREADSHEET_ID}/values/Log!A1:append?valueInputOption=RAW&insertDataOption=INSERT_ROWS`,{
+      method:'POST',headers:{Authorization:`Bearer ${gisToken}`,'Content-Type':'application/json'},
+      body:JSON.stringify({values:rows})
+    });
+    return r.ok;
+  }catch{return false;}
+}
+
+async function ensureSheetHeaders(){
+  try{
+    const data=await sheetsGet('Log!A1');
+    if(!data||(data.values??[])[0]?.[0]==='id') return;
+    await sheetsPut('Log!A1',[SHEET_HEADERS]);
+  }catch{}
+}
+
+async function pullFromSheets(){
+  if(!gisToken||!SHEETS_SPREADSHEET_ID) return;
+  try{
+    const data=await sheetsGet('Log!A:N');
+    if(!data) return;
+    const rows=(data.values??[]).slice(1).filter(r=>r.length>=12);
+    const grouped={};
+    rows.forEach(row=>{grouped[row[0]]??=[];grouped[row[0]].push(row);});
+    const sheetIds=new Set(Object.keys(grouped).map(Number));
+    const cutoff=Date.now()-28*24*60*60*1000;
+    let log=JSON.parse(localStorage.getItem('train_log')||'[]');
+    log=log.filter(e=>!e.synced||sheetIds.has(e.id)||new Date(e.date).getTime()<=cutoff);
+    const localIds=new Set(log.map(e=>e.id));
+    Object.values(grouped).forEach(sessionRows=>{
+      const entry=rowsToSession(sessionRows);
+      if(!localIds.has(entry.id)&&new Date(entry.date).getTime()>cutoff){log.push(entry);}
+    });
+    log.sort((a,b)=>b.id-a.id);
+    localStorage.setItem('train_log',JSON.stringify(log));
+  }catch{}
+}
+
 function initGIS(){
   if(!SHEETS_CLIENT_ID||!window.google) return;
   tokenClient=google.accounts.oauth2.initTokenClient({
     client_id:SHEETS_CLIENT_ID,
     scope:'https://www.googleapis.com/auth/spreadsheets',
-    callback:(resp)=>{
+    callback:async(resp)=>{
       if(resp.error) return;
       gisToken=resp.access_token;
       localStorage.setItem('train_signin','1');
-      pullFromSheets().then(()=>{renderLog();renderSettings();});
+      await ensureSheetHeaders();
+      await pullFromSheets();
+      renderLog();renderSettings();
     }
   });
   if(localStorage.getItem('train_signin')==='1') tokenClient.requestAccessToken({prompt:''});
@@ -371,61 +452,6 @@ function signOut(){
   gisToken=null;
   localStorage.removeItem('train_signin');
   renderLog();renderSettings();
-}
-
-function sessionToRows(e){
-  return e.exercises.map(ex=>[
-    e.id, e.date, e.phaseLabel, e.session, e.completionPct, e.durationMin||'',
-    ex.name, ex.muscle, ex.type, ex.load, ex.setsCompleted, ex.setsTarget
-  ]);
-}
-function rowsToSession(rows){
-  const r=rows[0];
-  return{
-    id:Number(r[0]),date:r[1],phase:r[2].toLowerCase().replace(' ','').slice(0,2),phaseLabel:r[2],session:r[3],
-    completionPct:Number(r[4]),durationMin:r[5]?Number(r[5]):null,
-    totalSets:rows.reduce((a,x)=>a+Number(x[11]),0),
-    completedSets:rows.reduce((a,x)=>a+Number(x[10]),0),
-    exercises:rows.map(x=>({name:x[6],muscle:x[7],type:x[8],load:x[9],setsCompleted:Number(x[10]),setsTarget:Number(x[11])})),
-    synced:true
-  };
-}
-
-async function sheetsAppend(rows){
-  if(!gisToken||!SHEETS_SPREADSHEET_ID) return false;
-  try{
-    const r=await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${SHEETS_SPREADSHEET_ID}/values/Log!A1:append?valueInputOption=RAW&insertDataOption=INSERT_ROWS`,{
-      method:'POST',
-      headers:{Authorization:`Bearer ${gisToken}`,'Content-Type':'application/json'},
-      body:JSON.stringify({values:rows})
-    });
-    return r.ok;
-  }catch{return false;}
-}
-
-async function pullFromSheets(){
-  if(!gisToken||!SHEETS_SPREADSHEET_ID) return;
-  try{
-    const r=await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${SHEETS_SPREADSHEET_ID}/values/Log!A:L`,{headers:{Authorization:`Bearer ${gisToken}`}});
-    if(!r.ok) return;
-    const data=await r.json();
-    const rows=(data.values||[]).slice(1).filter(r=>r.length>=11);
-    const grouped={};
-    rows.forEach(row=>{grouped[row[0]]=grouped[row[0]]||[];grouped[row[0]].push(row);});
-    const sheetIds=new Set(Object.keys(grouped).map(Number));
-    const cutoff=Date.now()-28*24*60*60*1000;
-    let log=JSON.parse(localStorage.getItem('train_log')||'[]');
-    // remove sessions that were synced but deleted from Sheets
-    log=log.filter(e=>!e.synced||sheetIds.has(e.id)||new Date(e.date).getTime()<=cutoff);
-    // add sessions from Sheets not in local
-    const localIds=new Set(log.map(e=>e.id));
-    Object.values(grouped).forEach(sessionRows=>{
-      const entry=rowsToSession(sessionRows);
-      if(!localIds.has(entry.id)&&new Date(entry.date).getTime()>cutoff){log.push(entry);localIds.add(entry.id);}
-    });
-    log.sort((a,b)=>b.id-a.id);
-    localStorage.setItem('train_log',JSON.stringify(log));
-  }catch{}
 }
 
 let syncing=false;
@@ -443,7 +469,7 @@ async function syncUnsynced(){
   syncing=false;renderLog();
 }
 
-function switchPhase(p){currentPhase=p;const sessions=Object.keys(PLAN[p].sessions);currentSession=sessions[0];setsDone={};warmupDone={};sessionStart=null;save();renderToday()}
+function switchPhase(p){currentPhase=p;const sessions=Object.keys(PLAN[p].sessions);currentSession=sessions[0];setsDone={};warmupDone={};sessionStart=null;editingLogId=null;save();renderToday()}
 
 function getSuggestedSession(){
   const log=JSON.parse(localStorage.getItem('train_log')||'[]');
@@ -483,7 +509,8 @@ function renderToday(){
   const pct=totalSets?Math.round(doneSets/totalSets*100):0;
 
   const suggested=getSuggestedSession();
-  let html=`<div class="date-header"><div class="day">${getDateStr()}</div><div class="sub">50 min · phone in bag</div></div>
+  let html=editingLogId?`<div style="display:flex;align-items:center;justify-content:space-between;padding:10px 14px;background:var(--amber-bg);border:1.5px solid #fbbf24;border-radius:10px;margin-bottom:14px"><span style="font-size:12px;font-weight:600;color:var(--amber)">Editing saved session</span><button onclick="cancelEditSession()" style="font-size:11px;font-weight:600;color:var(--amber);background:none;border:none;cursor:pointer;padding:0">Cancel ✕</button></div>`:''
+  html+=`<div class="date-header"><div class="day">${getDateStr()}</div><div class="sub">50 min · phone in bag</div></div>
   <div class="phase-toggle">
     <button class="phase-btn${currentPhase==='p1'?' active':''}" onclick="switchPhase('p1')">Phase 1 <span style="font-weight:400;opacity:.7">Jun–Jul</span></button>
     <button class="phase-btn${currentPhase==='p2'?' active':''}" onclick="switchPhase('p2')">Phase 2 <span style="font-weight:400;opacity:.7">Tue/Thu/Sat</span></button>
@@ -631,6 +658,7 @@ function updateFinishBtn(){
   const doneSets=Object.values(setsDone).flat().filter(Boolean).length;
   const btn=document.getElementById('btn-finish');
   const pct=Math.round(doneSets/totalSets*100);
+  if(editingLogId){btn.disabled=false;btn.classList.add('ready');btn.textContent=`Save edits (${pct}%)`;return}
   if(doneSets===0){btn.disabled=true;btn.textContent='Start session to unlock';btn.classList.remove('ready');return}
   btn.disabled=doneSets<totalSets*0.5;
   btn.classList.toggle('ready',doneSets>=totalSets*0.5);
@@ -639,9 +667,25 @@ function updateFinishBtn(){
 
 function finishSession(){
   const exercises=PLAN[currentPhase].sessions[currentSession];
+  const log=JSON.parse(localStorage.getItem('train_log')||'[]');
+  if(editingLogId){
+    const idx=log.findIndex(e=>e.id===editingLogId);
+    if(idx!==-1){
+      const orig=log[idx];
+      orig.exercises=exercises.map((ex,i)=>({name:ex.name,muscle:ex.muscle,type:ex.type,load:ex.load,setsTarget:ex.sets,setsCompleted:(setsDone[i]||[]).filter(Boolean).length}));
+      orig.completedSets=Object.values(setsDone).flat().filter(Boolean).length;
+      orig.totalSets=exercises.reduce((a,e)=>a+e.sets,0);
+      orig.completionPct=Math.round(orig.completedSets/orig.totalSets*100);
+      orig.synced=false;
+      localStorage.setItem('train_log',JSON.stringify(log));
+    }
+    editingLogId=null;setsDone={};sessionStart=null;
+    renderToday();renderLog();
+    showPage('log',document.querySelectorAll('nav button')[1]);
+    return;
+  }
   const endTime=new Date().toISOString();
   const durationMin=sessionStart?Math.round((new Date(endTime)-new Date(sessionStart))/60000):null;
-  const log=JSON.parse(localStorage.getItem('train_log')||'[]');
   const entry={
     id:Date.now(),date:endTime,sessionStart,durationMin,
     phase:currentPhase,phaseLabel:PLAN[currentPhase].label,session:currentSession,
@@ -669,19 +713,28 @@ function loadSessionFromLog(id){
   const log=JSON.parse(localStorage.getItem('train_log')||'[]');
   const entry=log.find(e=>e.id===id);
   if(!entry) return;
-  currentPhase=entry.phase;
-  currentSession=entry.session;
+  const phase=PLAN[entry.phase]?entry.phase:Object.keys(PLAN).find(k=>PLAN[k].label===entry.phaseLabel)||Object.keys(PLAN)[0];
+  const session=PLAN[phase].sessions[entry.session]?entry.session:Object.keys(PLAN[phase].sessions)[0];
+  editingLogId=id;
+  currentPhase=phase;
+  currentSession=session;
   warmupDone={};
   sessionStart=null;
   setsDone={};
   entry.exercises.forEach((ex,i)=>{
     if(ex.setsCompleted>0){
-      setsDone[i]=Array.from({length:ex.setsTarget},(_, s)=>s<ex.setsCompleted);
+      setsDone[i]=Array.from({length:ex.setsTarget},(_,s)=>s<ex.setsCompleted);
     }
   });
   save();
   renderToday();
   showPage('today',document.querySelectorAll('nav button')[0]);
+}
+
+function cancelEditSession(){
+  editingLogId=null;setsDone={};sessionStart=null;
+  renderToday();
+  showPage('log',document.querySelectorAll('nav button')[1]);
 }
 
 function getMondayKey(date){
@@ -773,6 +826,7 @@ function renderLog(){
         <div class="log-session">${entry.session} · ${entry.phaseLabel}
           <div style="display:flex;align-items:center;gap:6px">
             <span class="log-pct ${full?'full':'partial'}">${entry.completionPct}%</span>
+            <button onclick="event.stopPropagation();loadSessionFromLog(${entry.id})" style="font-size:11px;font-weight:600;color:var(--blue);background:var(--blue-bg);border:1px solid var(--blue-border);border-radius:6px;padding:3px 8px;cursor:pointer;font-family:inherit">Edit</button>
             <span class="log-chevron${expanded?' open':''}">⌄</span>
           </div>
         </div>
@@ -783,8 +837,7 @@ function renderLog(){
         const done=ex.setsCompleted===ex.setsTarget;
         html+=`<div class="log-ex"><span>${ex.name}<span style="color:var(--dim);font-size:10px;margin-left:6px">${ex.load}</span></span><span style="color:${done?'var(--green)':'var(--amber)'}">${ex.setsCompleted}/${ex.setsTarget}</span></div>`;
       });
-      html+=`</div>
-      <button onclick="loadSessionFromLog(${entry.id});event.stopPropagation()" style="width:100%;margin-top:10px;padding:10px;border:1.5px solid var(--blue-border);border-radius:8px;background:var(--surface);color:var(--blue);font-family:inherit;font-size:12px;font-weight:600;cursor:pointer">Load into Today →</button>`;
+      html+=`</div>`;
     }
     html+=`</div>`;
   });
@@ -887,7 +940,7 @@ function showPage(id,btn){
   document.getElementById('btn-finish').style.display=id==='today'?'block':'none';
 }
 
-function selectSession(s){currentSession=s;setsDone={};warmupDone={};sessionStart=null;save();renderToday()}
+function selectSession(s){currentSession=s;setsDone={};warmupDone={};sessionStart=null;editingLogId=null;save();renderToday()}
 
 function exportJSON(){
   const data={state:JSON.parse(localStorage.getItem('train_state')||'{}'),log:JSON.parse(localStorage.getItem('train_log')||'[]'),exported:new Date().toISOString()};
