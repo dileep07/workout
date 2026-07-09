@@ -665,6 +665,25 @@ function finishSession(){
   showPage('log',document.querySelectorAll('nav button')[1]);
 }
 
+function loadSessionFromLog(id){
+  const log=JSON.parse(localStorage.getItem('train_log')||'[]');
+  const entry=log.find(e=>e.id===id);
+  if(!entry) return;
+  currentPhase=entry.phase;
+  currentSession=entry.session;
+  warmupDone={};
+  sessionStart=null;
+  setsDone={};
+  entry.exercises.forEach((ex,i)=>{
+    if(ex.setsCompleted>0){
+      setsDone[i]=Array.from({length:ex.setsTarget},(_, s)=>s<ex.setsCompleted);
+    }
+  });
+  save();
+  renderToday();
+  showPage('today',document.querySelectorAll('nav button')[0]);
+}
+
 function getMondayKey(date){
   const d=new Date(date);const day=d.getDay();
   d.setDate(d.getDate()-(day===0?6:day-1));
@@ -764,7 +783,8 @@ function renderLog(){
         const done=ex.setsCompleted===ex.setsTarget;
         html+=`<div class="log-ex"><span>${ex.name}<span style="color:var(--dim);font-size:10px;margin-left:6px">${ex.load}</span></span><span style="color:${done?'var(--green)':'var(--amber)'}">${ex.setsCompleted}/${ex.setsTarget}</span></div>`;
       });
-      html+=`</div>`;
+      html+=`</div>
+      <button onclick="loadSessionFromLog(${entry.id});event.stopPropagation()" style="width:100%;margin-top:10px;padding:10px;border:1.5px solid var(--blue-border);border-radius:8px;background:var(--surface);color:var(--blue);font-family:inherit;font-size:12px;font-weight:600;cursor:pointer">Load into Today →</button>`;
     }
     html+=`</div>`;
   });
