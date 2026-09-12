@@ -72,6 +72,29 @@ nav button.active::after{content:'';position:absolute;bottom:0;left:24px;right:2
 .ex-sets.open{display:flex}
 .set-btn{padding:6px 14px;border:1.5px solid var(--border);border-radius:8px;background:var(--bg);color:var(--muted);font-family:inherit;font-size:11px;font-weight:500;cursor:pointer;transition:all .15s}
 .set-btn.done{border-color:var(--green-border);color:var(--green);background:var(--green-bg)}
+.log-ex-actual{color:var(--dim);font-size:11px;margin:2px 0 8px 0}
+.start-guided{width:100%;padding:14px;margin:4px 0 16px;background:var(--blue);color:#fff;border:none;border-radius:12px;font-family:inherit;font-size:14px;font-weight:700;cursor:pointer}
+.start-guided:active{opacity:.85}
+.guided-overlay{position:fixed;inset:0;z-index:100;background:rgba(20,20,20,.55);display:flex;align-items:flex-end;justify-content:center;padding:0}
+.guided-overlay.hidden{display:none}
+.guided-card{width:100%;max-width:520px;background:var(--surface);border-radius:18px 18px 0 0;padding:20px 18px calc(20px + env(safe-area-inset-bottom));box-shadow:0 -8px 40px rgba(0,0,0,.25);animation:guideUp .2s ease}
+@keyframes guideUp{from{transform:translateY(30px);opacity:.6}to{transform:translateY(0);opacity:1}}
+.guided-top{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px}
+.guided-count{font-size:12px;font-weight:700;color:var(--blue);background:var(--blue-bg);padding:4px 10px;border-radius:20px}
+.guided-x{background:none;border:none;color:var(--muted);font-family:inherit;font-size:13px;font-weight:600;cursor:pointer}
+.guided-name{font-size:20px;font-weight:700;line-height:1.2}
+.guided-meta{font-size:13px;color:var(--muted);margin:4px 0 16px}
+.gset-list{display:flex;flex-direction:column;gap:10px;margin-bottom:20px}
+.gset-row{display:flex;align-items:center;gap:8px}
+.gset-label{width:52px;font-size:12px;font-weight:600;color:var(--muted);flex-shrink:0}
+.gset-inp{width:70px;padding:11px 8px;border:1.5px solid var(--border2);border-radius:10px;background:var(--bg);color:var(--text);font-family:inherit;font-size:16px;font-weight:600;text-align:center;box-sizing:border-box}
+.gset-inp:focus{outline:none;border-color:var(--blue)}
+.gset-wt{flex:1;width:auto;text-align:left}
+.gset-unit{font-size:12px;color:var(--muted);width:32px;flex-shrink:0}
+.guided-actions{display:flex;gap:10px}
+.gbtn{flex:1;padding:14px;border-radius:12px;font-family:inherit;font-size:14px;font-weight:700;cursor:pointer;border:1.5px solid var(--border2);background:var(--surface);color:var(--text)}
+.gbtn.primary{background:var(--blue);color:#fff;border-color:var(--blue);flex:2}
+.gbtn.ghost:disabled{opacity:.4;cursor:default}
 
 #btn-finish{width:100%;padding:16px;background:var(--text);color:#fff;border:none;font-family:inherit;font-size:15px;font-weight:600;cursor:pointer;flex-shrink:0;letter-spacing:-.01em;transition:all .2s;padding-bottom:calc(16px + env(safe-area-inset-bottom))}
 #btn-finish:disabled{background:var(--border);color:var(--muted);cursor:default}
@@ -121,9 +144,6 @@ nav button.active::after{content:'';position:absolute;bottom:0;left:24px;right:2
 
 .action-btn{width:100%;padding:13px;background:var(--surface);border:1.5px solid var(--border);color:var(--text);font-family:inherit;font-size:13px;font-weight:600;border-radius:10px;cursor:pointer;margin-top:10px;transition:background .15s}
 .action-btn:active{background:var(--bg)}
-.phase-toggle{display:flex;gap:6px;margin-bottom:14px}
-.phase-btn{flex:1;padding:9px 0;border:1.5px solid var(--border);border-radius:10px;background:var(--surface);color:var(--muted);font-family:inherit;font-size:12px;font-weight:600;cursor:pointer;transition:all .15s;text-align:center}
-.phase-btn.active{background:var(--text);color:#fff;border-color:var(--text)}
 .next-badge{display:flex;align-items:center;gap:8px;padding:10px 14px;background:var(--blue-bg);border:1px solid var(--blue-border);border-radius:10px;margin-bottom:14px;font-size:12px;color:var(--blue);font-weight:500}
 .next-badge .nb-label{color:var(--muted);font-weight:400;margin-right:2px}
 
@@ -172,21 +192,8 @@ nav button.active::after{content:'';position:absolute;bottom:0;left:24px;right:2
   <div id="settings" class="page"></div>
   <button id="btn-finish" onclick="finishSession()" disabled>Start session to unlock</button>
 </div>
+<div id="guided" class="guided-overlay hidden"></div>
 <script>
-const WARMUP_P1=[
-  {id:'w0',name:'Neck rotations',note:'5 slow circles each direction — stop if trap hurts'},
-  {id:'w1',name:'Waist rotations',note:'10 each direction, hands on hips'},
-  {id:'w2',name:'Wrist circles + chest stretch',note:'10 wrist circles each, then clasp hands behind back'},
-  {id:'w3',name:'Dog pose spine stretch',note:'5 breaths, push floor away, lengthen spine'},
-  {id:'w4',name:'Leg raises',note:'10 reps, control the descent'},
-  {id:'w5',name:'Hip rotations',note:'10 each side, big circles'},
-  {id:'w6',name:'Calf stretch',note:'30 sec each side, heel on floor'},
-  {id:'w7',name:'Ankle circles',note:'10 each direction each ankle'},
-  {id:'w8',name:'Hamstring stretch',note:'30 sec each side, posterior pelvic tilt'},
-  {id:'w9',name:'90/90 hip stretch',note:'2 min each side — daily mobility'},
-  {id:'w10',name:'Toe doming',note:'2 min standing — foot strength'},
-  {id:'w11',name:'Thoracic rotation',note:'10 each side seated — helps trap'},
-];
 const WARMUP_P2=[
   {id:'w0',name:'Neck rotations',note:'5 slow circles each direction'},
   {id:'w1',name:'Waist rotations',note:'10 each direction'},
@@ -203,73 +210,43 @@ const WARMUP_P2=[
   {id:'w12',name:'Thoracic rotation',note:'10 each side seated'},
 ];
 const PLAN = {
-  p1:{
-    label:'Phase 1',sub:'Jun–Jul · injury-safe',
-    sessions:{
-      'Monday':[
-        {section:'Core first',name:'Dead bug',meta:'3×10 · lower back flat on floor',load:'BW',sets:3,muscle:'core',type:'strength'},
-        {name:'Plank',meta:'3×30 sec · stop before form breaks',load:'BW',sets:3,muscle:'core',type:'strength'},
-        {name:'Side plank',meta:'2×20 sec each side',load:'BW',sets:4,muscle:'core',type:'strength'},
-        {section:'Upper body (safe)',name:'Incline push-up',meta:'3×12 · hands on bench, chest to bar',load:'BW',sets:3,muscle:'chest',type:'strength',note:'new'},
-        {name:'Band pull-apart',meta:'3×15 · arms straight, squeeze shoulder blades',load:'light band',sets:3,muscle:'upper back',type:'strength',note:'new'},
-        {name:'Prone Y-raise',meta:'3×12 · lying face down, thumbs up, small range',load:'BW',sets:3,muscle:'traps',type:'rehab',note:'new'},
-        {section:'Lower body',name:'Goblet squat',meta:'4×10 · 3 sec down, pause at bottom',load:'20 kg',sets:4,muscle:'legs',type:'strength'},
-        {name:'Romanian deadlift',meta:'4×12 · feel the hamstring stretch',load:'12 kg each',sets:4,muscle:'hamstrings',type:'strength'},
-        {name:'Glute bridge',meta:'3×15 · 2 sec squeeze at top',load:'BW',sets:3,muscle:'glutes',type:'strength'},
-        {name:'Step-ups',meta:'3×10 each leg · controlled descent',load:'BW',sets:6,muscle:'legs',type:'strength'},
-        {section:'Explosive',name:'Jump squat',meta:'3×6 · land soft toes→midfoot→heel',load:'BW',sets:3,muscle:'legs',type:'explosive'},
-        {name:'Lateral shuffle',meta:'3×20 sec · low badminton stance',load:'BW',sets:3,muscle:'legs',type:'explosive'},
-      ],
-      'Friday':[
-        {section:'Core first',name:'Dead bug',meta:'3×12 · opposite arm + leg',load:'BW',sets:3,muscle:'core',type:'strength'},
-        {name:'Hollow body hold',meta:'3×20 sec · lower back pressed down',load:'BW',sets:3,muscle:'core',type:'strength'},
-        {section:'Upper body (safe)',name:'Incline push-up',meta:'3×15 · progress to flat when easy',load:'BW',sets:3,muscle:'chest',type:'strength',note:'new'},
-        {name:'Band pull-apart',meta:'3×20 · wide grip, keep arms straight',load:'light band',sets:3,muscle:'upper back',type:'strength',note:'new'},
-        {name:'Single-arm DB row',meta:'3×12 each · brace on bench, neutral wrist',load:'10 kg',sets:6,muscle:'back',type:'strength',note:'new'},
-        {section:'Lower body',name:'Bulgarian split squat',meta:'3×10 each · rear foot on bench',load:'10 kg each',sets:6,muscle:'legs',type:'strength'},
-        {name:'Romanian deadlift',meta:'4×12 · add 2 kg if Monday felt easy',load:'12–14 kg each',sets:4,muscle:'hamstrings',type:'strength'},
-        {name:'Single-leg glute bridge',meta:'3×12 each · other leg extended',load:'BW',sets:6,muscle:'glutes',type:'strength'},
-        {name:'Farmer carry',meta:'3×30 m · wrist neutral, shoulders back',load:'14 kg each',sets:3,muscle:'grip',type:'strength',note:'new'},
-        {section:'Explosive',name:'Broad jump',meta:'3×5 · max horizontal distance',load:'BW',sets:3,muscle:'legs',type:'explosive'},
-        {name:'Depth drop',meta:'3×6 · step off low step, absorb quietly',load:'BW',sets:3,muscle:'legs',type:'explosive'},
-      ]
-    }
-  },
   p2:{
     label:'Phase 2',sub:'Tue/Thu/Sat · skill + strength',
     sessions:{
       'Session A':[
+        {section:'Explosive',name:'Jump squat',meta:'3×6 · max height',load:'BW',sets:3,muscle:'legs',type:'explosive'},
+        {section:'Skill',name:'Tuck front lever',meta:'3×8s · stop 2s before form breaks',load:'BW',sets:3,muscle:'back',type:'skill',holdSec:8},
+        {name:'Tuck L-sit',meta:'3×12s · stop 2s before form breaks',load:'BW',sets:3,muscle:'core',type:'skill',holdSec:12},
+        {section:'Strength',name:'Pull-ups',meta:'2×8 + 1×AMRAP',load:'BW',sets:3,muscle:'back',type:'strength'},
+        {name:'Barbell squat',meta:'3×8 @ 60 kg · fixed reps, not to failure',load:'60 kg',sets:3,muscle:'legs',type:'strength'},
+        {name:'Aussie rows (feet elevated)',meta:'2×12 + 1×AMRAP',load:'BW',sets:3,muscle:'back',type:'strength'},
+        {name:'Standing calf raise',meta:'3×20 · 3s down',load:'20 kg',sets:3,muscle:'calves',type:'strength'},
         {section:'Core',name:'Dead bug',meta:'3×12 · lower back flat',load:'BW',sets:3,muscle:'core',type:'strength'},
         {name:'Hollow hold',meta:'3×25s · lower back pressed down',load:'BW',sets:3,muscle:'core',type:'strength'},
-        {section:'Skill',name:'Tuck front lever',meta:'5×8s · stop 2s before form breaks',load:'BW',sets:5,muscle:'back',type:'skill',holdSec:8},
-        {name:'Tuck L-sit',meta:'5×12s · stop 2s before form breaks',load:'BW',sets:5,muscle:'core',type:'skill',holdSec:12},
-        {section:'Strength',name:'Pull-ups',meta:'4×5 + 1×8',load:'BW',sets:5,muscle:'back',type:'strength'},
-        {name:'Barbell squat',meta:'3×5 @ 60 kg + 1×10 @ 50 kg',load:'50–60 kg',sets:4,muscle:'legs',type:'strength'},
-        {name:'Aussie rows (feet elevated)',meta:'4×12',load:'BW',sets:4,muscle:'back',type:'strength'},
-        {name:'Standing calf raise',meta:'3×20 · 3s down',load:'20 kg',sets:3,muscle:'calves',type:'strength'},
-        {section:'Explosive',name:'Jump squat',meta:'4×6 · max height',load:'BW',sets:4,muscle:'legs',type:'explosive'},
       ],
       'Session B':[
+        {section:'Explosive',name:'Split squat jump',meta:'3×6 each · switch legs mid-air',load:'BW',sets:6,muscle:'legs',type:'explosive'},
+        {section:'Skill',name:'Pike push-up',meta:'3×8 · controlled',load:'BW',sets:3,muscle:'shoulders',type:'strength'},
+        {name:'Support hold',meta:'3×15s · top of dip position',load:'BW',sets:3,muscle:'chest',type:'skill',holdSec:15},
+        {name:'Wall handstand',meta:'2×15s · wrist must be 100%',load:'BW',sets:2,muscle:'shoulders',type:'skill',holdSec:15,wristGated:true},
+        {section:'Strength',name:'Dips (fists/handles)',meta:'2×8 + 1×AMRAP',load:'BW',sets:3,muscle:'chest',type:'strength'},
+        {name:'DB Romanian deadlift',meta:'3×10',load:'17–20 kg each',sets:3,muscle:'hamstrings',type:'strength'},
+        {name:'Push-ups',meta:'2×12 + 1×AMRAP',load:'BW',sets:3,muscle:'chest',type:'strength'},
+        {name:'Lateral raise',meta:'2×15 · light, slow',load:'5–7 kg',sets:2,muscle:'shoulders',type:'strength'},
+        {name:'Bulgarian split squat',meta:'3×10 each',load:'12–14 kg each',sets:6,muscle:'legs',type:'strength'},
         {section:'Core',name:'Plank',meta:'3×40s',load:'BW',sets:3,muscle:'core',type:'strength'},
         {name:'Side plank',meta:'3×25s each side',load:'BW',sets:6,muscle:'core',type:'strength'},
-        {section:'Skill',name:'Pike push-up',meta:'4×8 · controlled',load:'BW',sets:4,muscle:'shoulders',type:'strength'},
-        {name:'Support hold',meta:'4×15s · top of dip position',load:'BW',sets:4,muscle:'chest',type:'skill',holdSec:15},
-        {section:'Strength',name:'Dips (fists/handles)',meta:'4×5 + 1×10',load:'BW',sets:5,muscle:'chest',type:'strength'},
-        {name:'DB Romanian deadlift',meta:'4×10',load:'17–20 kg each',sets:4,muscle:'hamstrings',type:'strength'},
-        {name:'Push-ups',meta:'4×12',load:'BW',sets:4,muscle:'chest',type:'strength'},
-        {name:'Lateral raise',meta:'3×15 · light, slow',load:'5–7 kg',sets:3,muscle:'shoulders',type:'strength'},
-        {name:'Bulgarian split squat',meta:'3×10 each',load:'12–14 kg each',sets:6,muscle:'legs',type:'strength'},
-        {section:'Explosive',name:'Split squat jump',meta:'3×6 each · switch legs mid-air',load:'BW',sets:6,muscle:'legs',type:'explosive'},
       ],
       'Session C':[
-        {section:'Skill practice',name:'Tuck front lever',meta:'4×8s · no grind',load:'BW',sets:4,muscle:'back',type:'skill',holdSec:8},
-        {name:'Tuck L-sit',meta:'4×12s · no grind',load:'BW',sets:4,muscle:'core',type:'skill',holdSec:12},
-        {name:'Wall handstand',meta:'3×20s · wrist must be 100%',load:'BW',sets:3,muscle:'shoulders',type:'skill',holdSec:20,wristGated:true},
-        {section:'Light full body',name:'Goblet squat (slow)',meta:'3×12 · 4s down',load:'20 kg',sets:3,muscle:'legs',type:'strength'},
-        {name:'Aussie rows',meta:'3×12',load:'BW',sets:3,muscle:'back',type:'strength'},
-        {name:'Push-ups',meta:'3×12',load:'BW',sets:3,muscle:'chest',type:'strength'},
         {section:'Agility',name:'Lateral bounds',meta:'3×8 each · stick landing 1s',load:'BW',sets:6,muscle:'legs',type:'explosive'},
         {name:'Box jumps',meta:'3×5 · step down, never jump down',load:'BW',sets:3,muscle:'legs',type:'explosive'},
+        {section:'Skill practice',name:'Tuck front lever',meta:'3×8s · no grind',load:'BW',sets:3,muscle:'back',type:'skill',holdSec:8},
+        {name:'Tuck L-sit',meta:'3×12s · no grind',load:'BW',sets:3,muscle:'core',type:'skill',holdSec:12},
+        {name:'Wall handstand',meta:'3×20s · wrist must be 100%',load:'BW',sets:3,muscle:'shoulders',type:'skill',holdSec:20,wristGated:true},
+        {name:'Pistol squat',meta:'3×5 each · progress via rungs',load:'assisted',sets:6,muscle:'legs',type:'skill'},
+        {section:'Light full body',name:'Single-leg RDL',meta:'3×10 each · slow, controlled',load:'BW / light DB',sets:6,muscle:'hamstrings',type:'strength'},
+        {name:'Aussie rows',meta:'3×12',load:'BW',sets:3,muscle:'back',type:'strength'},
+        {name:'Push-ups',meta:'3×12',load:'BW',sets:3,muscle:'chest',type:'strength'},
       ]
     }
   }
@@ -282,18 +259,18 @@ let SHEETS_SPREADSHEET_ID=localStorage.getItem('train_gsid')||'';
 const MOBILITY=['90/90 hip stretch — 2 min each side','Hamstring stretch (posterior pelvic tilt) — 2 min','Single-leg calf raise off step, 3 sec down — 3×15 each','Toe doming standing — 2 min','Thoracic rotation seated — 10 each side'];
 
 const PROGRESSION=[
-  {name:'Pull-ups',loads:['BW','+5 kg','+10 kg','archer','one-arm'],trigger:'4×8 clean for 2 sessions'},
-  {name:'Dips (fists/handles)',loads:['BW','+5 kg','+10 kg','ring dips'],trigger:'3×10 clean for 2 sessions'},
-  {name:'Push-ups',loads:['standard','archer','pseudo planche'],trigger:'3×15 clean for 2 sessions'},
-  {name:'Aussie rows (feet elevated)',loads:['feet flat','feet elevated','weighted','one-arm'],trigger:'4×12 clean for 2 sessions'},
-  {name:'Aussie rows',loads:['feet flat','feet elevated','weighted','one-arm'],trigger:'4×12 clean for 2 sessions'},
-  {name:'Barbell squat',loads:['60 kg','65 kg','70 kg','75 kg','80 kg'],trigger:'5×5 solid for 2 sessions'},
-  {name:'DB Romanian deadlift',loads:['17 kg each','20 kg each','22 kg each'],trigger:'4×10 easy for 2 sessions'},
+  {name:'Pull-ups',loads:['BW','+5 kg','+10 kg','archer','one-arm'],trigger:'AMRAP set ≥12 reps for 2 sessions'},
+  {name:'Dips (fists/handles)',loads:['BW','+5 kg','+10 kg','ring dips'],trigger:'AMRAP set ≥15 reps for 2 sessions'},
+  {name:'Push-ups',loads:['standard','archer','pseudo planche'],trigger:'AMRAP set ≥20 reps for 2 sessions'},
+  {name:'Aussie rows (feet elevated)',loads:['feet flat','feet elevated','weighted','one-arm'],trigger:'AMRAP set ≥15 reps for 2 sessions'},
+  {name:'Aussie rows',loads:['feet flat','feet elevated','weighted','one-arm'],trigger:'AMRAP set ≥15 reps for 2 sessions'},
+  {name:'Barbell squat',loads:['60 kg','65 kg','70 kg','75 kg','80 kg'],trigger:'3×8 clean (fixed reps) for 2 sessions'},
+  {name:'DB Romanian deadlift',loads:['17 kg each','20 kg each','22 kg each'],trigger:'3×10 easy for 2 sessions'},
   {name:'Bulgarian split squat',loads:['12 kg each','14 kg each','16 kg each'],trigger:'3×10 clean for 2 sessions'},
   {name:'Standing calf raise',loads:['20 kg','24 kg','28 kg'],trigger:'3×20 clean for 2 sessions'},
-  {name:'Lateral raise',loads:['5 kg','7 kg','9 kg'],trigger:'3×15 clean for 2 sessions'},
-  {name:'Jump squat',loads:['BW','+5 kg vest','+10 kg vest'],trigger:'4×6 controlled for 2 sessions'},
-  {name:'Goblet squat (slow)',loads:['20 kg','24 kg','28 kg'],trigger:'3×12 clean for 2 sessions'},
+  {name:'Lateral raise',loads:['5 kg','7 kg','9 kg'],trigger:'2×15 clean for 2 sessions'},
+  {name:'Jump squat',loads:['BW','+5 kg vest','+10 kg vest'],trigger:'3×6 controlled for 2 sessions'},
+  {name:'Single-leg RDL',loads:['BW','+5 kg each','+8 kg each'],trigger:'3×10 clean each side for 2 sessions'},
   {name:'Dead bug',loads:['3×10','3×12','3×15','ankle weights 3×12'],trigger:'clean for 2 sessions'},
   {name:'Hollow hold',loads:['3×20s','3×25s','3×30s','3×40s'],trigger:'clean for 2 sessions'},
   {name:'Hollow body hold',loads:['3×20s','3×25s','3×30s','3×40s'],trigger:'clean for 2 sessions'},
@@ -303,24 +280,28 @@ const PROGRESSION=[
 const PROG_MAP=Object.fromEntries(PROGRESSION.map(p=>[p.name,p]));
 
 const SKILL_PROGRESSIONS=[
-  {name:'L-sit',rungs:['Tuck hold — 5×10s','Tuck longer — 5×15s','Advanced tuck — 5×12s','One-leg extended — 5×10s each','Full L-sit — 5×10s']},
-  {name:'Front lever',rungs:['Scap pull-ups (prereq) — 4×8','Tuck FL — 5×8s','Tuck FL longer — 5×12s','Advanced tuck — 5×8s','One-leg FL — 5×8s each','Straddle FL — 5×5s']},
-  {name:'HSPU (pike path)',rungs:['Pike push-up, feet on floor — 4×8','Feet on low box — 4×6','Feet on high box — 4×6','Wall HSPU negatives — 4×3','Wall HSPU full — 4×5']},
-  {name:'Handstand',rungs:['Wall walks — 3×3','Chest-to-wall hold — 3×20s','Free balance kicks — 3×5','Free handstand — 3×10s'],gated:'wrist'},
+  {name:'L-sit',rungs:['Tuck hold — 3×10s','Tuck longer — 3×15s','Advanced tuck — 3×12s','One-leg extended — 3×10s each','Full L-sit — 3×10s']},
+  {name:'Front lever',rungs:['Scap pull-ups (prereq) — 3×8','Tuck FL — 3×8s','Tuck FL longer — 3×12s','Advanced tuck — 3×8s','One-leg FL — 3×8s each','Straddle FL — 3×5s']},
+  {name:'HSPU (pike path)',rungs:['Pike push-up, feet on floor — 3×8','Feet on low box — 3×6','Feet on high box — 3×6','Wall HSPU negatives — 3×3','Wall HSPU full — 3×5']},
+  {name:'Handstand',rungs:['Wall walks — 3×3 (2x/week)','Chest-to-wall hold — 3×15s (2x/week)','Free balance kicks — 3×5','Free handstand — 3×10s'],gated:'wrist'},
+  {name:'Pistol squat',rungs:['Assisted (holding support) — 3×5 each','Box pistol (sit to box) — 3×5 each','Full pistol — 3×5 each','Weighted pistol — 3×5 each']},
 ];
 const SKILL_EX_MAP={
   'Tuck front lever':'Front lever',
   'Tuck L-sit':'L-sit',
   'Wall handstand':'Handstand',
   'Pike push-up':'HSPU (pike path)',
+  'Pistol squat':'Pistol squat',
 };
 
 let state=JSON.parse(localStorage.getItem('train_state')||'{}');
 let warmupDone={};
 let warmupOpen=true;
-let currentPhase=PLAN[state.phase]?state.phase:'p1';
-let currentSession=state.session||'Monday';
+let currentPhase=PLAN[state.phase]?state.phase:'p2';
+let currentSession=PLAN.p2.sessions[state.session]?state.session:'Session A';
 let setsDone={};
+let setsData={};
+let guidedIdx=0;
 let sessionStart=null;
 let editingLogId=null;
 let wristUnlocked=JSON.parse(localStorage.getItem('train_wrist')||'false');
@@ -351,26 +332,26 @@ function selectProgRung(name,idx){
   renderToday();
 }
 
-const SHEET_HEADERS=['id','date','phase','session','completion_pct','duration_min','exercise','muscle','type','load','sets_completed','sets_target','warmup_completed','warmup_total'];
+const SHEET_HEADERS=['id','date','phase','session','completion_pct','duration_min','exercise','muscle','type','load','sets_completed','sets_target','warmup_completed','warmup_total','actual_reps'];
 
 function sessionToRows(e){
   return e.exercises.map(ex=>[
     e.id,e.date,e.phase,e.session,e.completionPct,e.durationMin??'',
     ex.name,ex.muscle,ex.type,ex.load,ex.setsCompleted,ex.setsTarget,
-    e.warmupCompleted??0,e.warmupTotal??0
+    e.warmupCompleted??0,e.warmupTotal??0,ex.actual??''
   ]);
 }
 
 function rowsToSession(rows){
   const r=rows[0];
-  const phase=PLAN[r[2]]?r[2]:'p1';
+  const phase=PLAN[r[2]]?r[2]:'p2';
   return{
     id:Number(r[0]),date:r[1],phase,phaseLabel:PLAN[phase].label,session:r[3],
     completionPct:Number(r[4]),durationMin:r[5]?Number(r[5]):null,
     warmupCompleted:Number(r[12])||0,warmupTotal:Number(r[13])||0,
     totalSets:rows.reduce((a,x)=>a+Number(x[11]),0),
     completedSets:rows.reduce((a,x)=>a+Number(x[10]),0),
-    exercises:rows.map(x=>({name:x[6],muscle:x[7],type:x[8],load:x[9],setsCompleted:Number(x[10]),setsTarget:Number(x[11])})),
+    exercises:rows.map(x=>({name:x[6],muscle:x[7],type:x[8],load:x[9],setsCompleted:Number(x[10]),setsTarget:Number(x[11]),actual:x[14]||''})),
     synced:true
   };
 }
@@ -501,8 +482,6 @@ async function syncUnsynced(){
   syncing=false;renderLog();
 }
 
-function switchPhase(p){currentPhase=p;const sessions=Object.keys(PLAN[p].sessions);currentSession=sessions[0];setsDone={};warmupDone={};sessionStart=null;editingLogId=null;save();renderToday()}
-
 function getSuggestedSession(){
   const log=JSON.parse(localStorage.getItem('train_log')||'[]');
   const phaseSessions=Object.keys(PLAN[currentPhase].sessions);
@@ -526,7 +505,7 @@ function toggleWarmup_item(id){
   warmupDone[id]=!warmupDone[id];
   const chk=document.getElementById('wchk-'+id);
   if(chk) chk.classList.toggle('done',warmupDone[id]);
-  const warmupItems=currentPhase==='p1'?WARMUP_P1:WARMUP_P2;
+  const warmupItems=WARMUP_P2;
   const count=warmupItems.filter(w=>warmupDone[w.id]).length;
   const el=document.getElementById('wup-count');
   if(el) el.textContent=count+'/'+warmupItems.length;
@@ -543,14 +522,10 @@ function renderToday(){
   const suggested=getSuggestedSession();
   let html=editingLogId?`<div style="display:flex;align-items:center;justify-content:space-between;padding:10px 14px;background:var(--amber-bg);border:1.5px solid #fbbf24;border-radius:10px;margin-bottom:14px"><span style="font-size:12px;font-weight:600;color:var(--amber)">Editing saved session</span><button onclick="cancelEditSession()" style="font-size:11px;font-weight:600;color:var(--amber);background:none;border:none;cursor:pointer;padding:0">Cancel ✕</button></div>`:''
   html+=`<div class="date-header"><div class="day">${getDateStr()}</div><div class="sub">50 min · phone in bag</div></div>
-  <div class="phase-toggle">
-    <button class="phase-btn${currentPhase==='p1'?' active':''}" onclick="switchPhase('p1')">Phase 1 <span style="font-weight:400;opacity:.7">Jun–Jul</span></button>
-    <button class="phase-btn${currentPhase==='p2'?' active':''}" onclick="switchPhase('p2')">Phase 2 <span style="font-weight:400;opacity:.7">Tue/Thu/Sat</span></button>
-  </div>
   ${suggested!==currentSession?`<div class="next-badge"><span class="nb-label">Suggested:</span>${suggested}<button onclick="selectSession('${suggested}')" style="margin-left:auto;padding:4px 10px;border:1px solid var(--blue-border);border-radius:6px;background:var(--surface);color:var(--blue);font-family:inherit;font-size:11px;font-weight:600;cursor:pointer">Switch</button></div>`:''}
   <div class="session-picker">`;
   sessions.forEach(s=>{html+=`<button class="sess-btn${s===currentSession?' active':''}" onclick="selectSession('${s}')">${s}</button>`});
-  const warmupItems=currentPhase==='p1'?WARMUP_P1:WARMUP_P2;
+  const warmupItems=WARMUP_P2;
   const warmupTotal=warmupItems.length;
   const warmupCount=warmupItems.filter(w=>warmupDone[w.id]).length;
   html+=`</div>
@@ -573,6 +548,7 @@ function renderToday(){
       </div>`).join('')}
     </div>
   </div>
+  <button class="start-guided" onclick="startGuided()">▶ Start guided workout</button>
   <div class="progress-wrap">
     <div class="progress-meta"><span>Progress</span><span>${pct}%</span></div>
     <div class="progress-bar"><div class="progress-fill" id="prog-fill" style="width:${pct}%"></div></div>
@@ -624,6 +600,8 @@ function renderToday(){
         html+=`<button class="set-btn${d?' done':''}" onclick="toggleSet(${i},${s},this)">set ${s+1}</button>`;
       }
     }
+    const summary=locked?'':formatSets(setsData[i]);
+    if(summary) html+=`<div class="log-ex-actual" style="margin:8px 0 0">↳ ${summary}</div>`;
     html+=`</div></div>`;
   });
   html+=`</div>`;
@@ -632,6 +610,104 @@ function renderToday(){
 }
 
 function toggleSets(i){document.getElementById('sets-'+i).classList.toggle('open')}
+
+function formatSets(sd){
+  if(!sd) return '';
+  const filled=sd.filter(s=>s&&String(s.reps).trim()!=='');
+  if(!filled.length) return '';
+  const reps=filled.map(s=>String(s.reps).trim());
+  const weights=[...new Set(filled.map(s=>String(s.weight||'').trim()).filter(Boolean))];
+  if(weights.length<=1) return reps.join(', ')+(weights[0]?' @ '+weights[0]:'');
+  return filled.map(s=>String(s.reps).trim()+(String(s.weight||'').trim()?'@'+String(s.weight).trim():'')).join(', ');
+}
+function guidedSeq(){
+  const exercises=PLAN[currentPhase].sessions[currentSession];
+  return exercises.map((e,i)=>i).filter(i=>!(exercises[i].wristGated&&!wristUnlocked));
+}
+function ensureSetsData(i,ex){
+  if(!setsData[i]||setsData[i].length!==ex.sets){
+    const cur=getProgLoad(ex.name,ex.load);
+    const prev=setsData[i]||[];
+    setsData[i]=Array.from({length:ex.sets},(_,s)=>prev[s]||{reps:'',weight:cur});
+  }
+  return setsData[i];
+}
+function startGuided(){
+  const seq=guidedSeq();
+  if(!seq.length) return;
+  if(!sessionStart) sessionStart=new Date().toISOString();
+  guidedIdx=0;
+  document.getElementById('guided').classList.remove('hidden');
+  renderGuided();
+}
+function renderGuided(){
+  const exercises=PLAN[currentPhase].sessions[currentSession];
+  const seq=guidedSeq();
+  if(guidedIdx<0) guidedIdx=0;
+  if(guidedIdx>=seq.length){closeGuided();return;}
+  const i=seq[guidedIdx];
+  const ex=exercises[i];
+  const sd=ensureSetsData(i,ex);
+  const isHold=ex.type==='skill'&&ex.holdSec;
+  const unit=isHold?'sec':'reps';
+  let rows='';
+  for(let s=0;s<ex.sets;s++){
+    const r=sd[s]||{reps:'',weight:''};
+    rows+=`<div class="gset-row">
+      <span class="gset-label">Set ${s+1}</span>
+      <input class="gset-inp" type="number" inputmode="numeric" placeholder="${isHold?ex.holdSec:'reps'}" value="${r.reps}" id="g-reps-${s}">
+      <span class="gset-unit">${unit}</span>
+      <input class="gset-inp gset-wt" type="text" placeholder="load" value="${String(r.weight||'').replace(/"/g,'&quot;')}" id="g-wt-${s}">
+    </div>`;
+  }
+  const isLast=guidedIdx===seq.length-1;
+  document.getElementById('guided').innerHTML=`<div class="guided-card">
+    <div class="guided-top">
+      <span class="guided-count">${guidedIdx+1} / ${seq.length}</span>
+      <button class="guided-x" onclick="closeGuided()">Close ✕</button>
+    </div>
+    <div class="guided-name">${ex.name}${isHold?' <span class="plan-tag skill">hold</span>':''}</div>
+    <div class="guided-meta">${ex.meta}</div>
+    <div class="gset-list">${rows}</div>
+    <div class="guided-actions">
+      <button class="gbtn ghost" onclick="guidedNav(-1)" ${guidedIdx===0?'disabled':''}>← Back</button>
+      <button class="gbtn primary" onclick="guidedNav(1)">${isLast?'Done ✓':'Next →'}</button>
+    </div>
+  </div>`;
+  setTimeout(()=>{const el=document.getElementById('g-reps-0');if(el) el.focus();},50);
+}
+function saveGuided(){
+  const exercises=PLAN[currentPhase].sessions[currentSession];
+  const seq=guidedSeq();
+  const i=seq[guidedIdx];
+  if(i==null) return;
+  const ex=exercises[i];
+  const sd=ensureSetsData(i,ex);
+  if(!setsDone[i]) setsDone[i]=[];
+  for(let s=0;s<ex.sets;s++){
+    const repsEl=document.getElementById('g-reps-'+s);
+    if(!repsEl) continue;
+    const reps=repsEl.value.trim();
+    const wtEl=document.getElementById('g-wt-'+s);
+    const wt=wtEl?wtEl.value.trim():'';
+    sd[s]={reps,weight:wt};
+    setsDone[i][s]=reps!==''&&Number(reps)!==0;
+  }
+  if(!sessionStart) sessionStart=new Date().toISOString();
+}
+function guidedNav(dir){
+  saveGuided();
+  const seq=guidedSeq();
+  guidedIdx+=dir;
+  if(guidedIdx>=seq.length){closeGuided();return;}
+  if(guidedIdx<0) guidedIdx=0;
+  renderGuided();
+}
+function closeGuided(){
+  saveGuided();
+  document.getElementById('guided').classList.add('hidden');
+  renderToday();
+}
 
 function handleSetClick(exIdx,setIdx,btn,holdSec){
   if(btn.classList.contains('done')){toggleSet(exIdx,setIdx,btn);btn.textContent='hold '+holdSec+'s';return}
@@ -704,7 +780,7 @@ function finishSession(){
     const idx=log.findIndex(e=>e.id===editingLogId);
     if(idx!==-1){
       const entry=log[idx];
-      entry.exercises=exercises.map((ex,i)=>({name:ex.name,muscle:ex.muscle,type:ex.type,load:ex.load,setsTarget:ex.sets,setsCompleted:(setsDone[i]||[]).filter(Boolean).length}));
+      entry.exercises=exercises.map((ex,i)=>({name:ex.name,muscle:ex.muscle,type:ex.type,load:ex.load,setsTarget:ex.sets,setsCompleted:(setsDone[i]||[]).filter(Boolean).length,sets:setsData[i]||[],actual:formatSets(setsData[i])}));
       entry.completedSets=Object.values(setsDone).flat().filter(Boolean).length;
       entry.totalSets=exercises.reduce((a,e)=>a+e.sets,0);
       entry.completionPct=Math.round(entry.completedSets/entry.totalSets*100);
@@ -717,7 +793,7 @@ function finishSession(){
         if(i!==-1){l[i].synced=true;localStorage.setItem('train_log',JSON.stringify(l));renderLog();}
       });
     }
-    editingLogId=null;setsDone={};sessionStart=null;
+    editingLogId=null;setsDone={};setsData={};sessionStart=null;
     renderToday();renderLog();
     showPage('log',document.querySelectorAll('nav button')[1]);
     return;
@@ -727,8 +803,8 @@ function finishSession(){
   const entry={
     id:Date.now(),date:endTime,sessionStart,durationMin,
     phase:currentPhase,phaseLabel:PLAN[currentPhase].label,session:currentSession,
-    warmupCompleted:Object.values(warmupDone).filter(Boolean).length,warmupTotal:(currentPhase==='p1'?WARMUP_P1:WARMUP_P2).length,
-    exercises:exercises.map((ex,i)=>({name:ex.name,muscle:ex.muscle,type:ex.type,load:ex.load,setsTarget:ex.sets,setsCompleted:(setsDone[i]||[]).filter(Boolean).length})),
+    warmupCompleted:Object.values(warmupDone).filter(Boolean).length,warmupTotal:(WARMUP_P2).length,
+    exercises:exercises.map((ex,i)=>({name:ex.name,muscle:ex.muscle,type:ex.type,load:ex.load,setsTarget:ex.sets,setsCompleted:(setsDone[i]||[]).filter(Boolean).length,sets:setsData[i]||[],actual:formatSets(setsData[i])})),
     totalSets:exercises.reduce((a,e)=>a+e.sets,0),
     completedSets:Object.values(setsDone).flat().filter(Boolean).length,
     completionPct:Math.round(Object.values(setsDone).flat().filter(Boolean).length/exercises.reduce((a,e)=>a+e.sets,0)*100)
@@ -742,7 +818,7 @@ function finishSession(){
     const i=l.findIndex(e=>e.id===entry.id);
     if(i!==-1){l[i].synced=true;localStorage.setItem('train_log',JSON.stringify(l));}
   });
-  setsDone={};sessionStart=null;
+  setsDone={};setsData={};sessionStart=null;
   renderToday();renderLog();
   showPage('log',document.querySelectorAll('nav button')[1]);
 }
@@ -759,9 +835,13 @@ function loadSessionFromLog(id){
   warmupDone={};
   sessionStart=null;
   setsDone={};
+  setsData={};
   entry.exercises.forEach((ex,i)=>{
     if(ex.setsCompleted>0){
       setsDone[i]=Array.from({length:ex.setsTarget},(_,s)=>s<ex.setsCompleted);
+    }
+    if(Array.isArray(ex.sets)&&ex.sets.length){
+      setsData[i]=ex.sets.map(s=>({reps:s.reps??'',weight:s.weight??''}));
     }
   });
   save();
@@ -770,7 +850,7 @@ function loadSessionFromLog(id){
 }
 
 function cancelEditSession(){
-  editingLogId=null;setsDone={};sessionStart=null;
+  editingLogId=null;setsDone={};setsData={};sessionStart=null;
   renderToday();
   showPage('log',document.querySelectorAll('nav button')[1]);
 }
@@ -874,6 +954,7 @@ function renderLog(){
       entry.exercises.forEach(ex=>{
         const done=ex.setsCompleted===ex.setsTarget;
         html+=`<div class="log-ex"><span>${ex.name}<span style="color:var(--dim);font-size:10px;margin-left:6px">${ex.load}</span></span><span style="color:${done?'var(--green)':'var(--amber)'}">${ex.setsCompleted}/${ex.setsTarget}</span></div>`;
+        if(ex.actual) html+=`<div class="log-ex-actual">↳ ${ex.actual}</div>`;
       });
       html+=`</div>`;
     }
@@ -888,9 +969,9 @@ function renderLog(){
 function exportCSV(){
   const log=JSON.parse(localStorage.getItem('train_log')||'[]');
   if(!log.length) return;
-  const rows=[['date','phase','session','exercise','muscle','type','load','sets_completed','sets_target','completion_pct','duration_min']];
-  log.forEach(entry=>{entry.exercises.forEach(ex=>{rows.push([new Date(entry.date).toLocaleDateString('en-AU'),entry.phaseLabel,entry.session,ex.name,ex.muscle,ex.type,ex.load,ex.setsCompleted,ex.setsTarget,entry.completionPct,entry.durationMin||''])})});
-  const csv=rows.map(r=>r.join(',')).join('\n');
+  const rows=[['date','phase','session','exercise','muscle','type','load','sets_completed','sets_target','actual_reps','completion_pct','duration_min']];
+  log.forEach(entry=>{entry.exercises.forEach(ex=>{rows.push([new Date(entry.date).toLocaleDateString('en-AU'),entry.phaseLabel,entry.session,ex.name,ex.muscle,ex.type,ex.load,ex.setsCompleted,ex.setsTarget,ex.actual||'',entry.completionPct,entry.durationMin||''])})});
+  const csv=rows.map(r=>r.map(c=>{const s=String(c);return /[",\n]/.test(s)?'"'+s.replace(/"/g,'""')+'"':s}).join(',')).join('\n');
   const blob=new Blob([csv],{type:'text/csv'});
   const url=URL.createObjectURL(blob);
   const a=document.createElement('a');a.href=url;a.download='train_log.csv';a.click();URL.revokeObjectURL(url);
@@ -978,7 +1059,7 @@ function showPage(id,btn){
   document.getElementById('btn-finish').style.display=id==='today'?'block':'none';
 }
 
-function selectSession(s){currentSession=s;setsDone={};warmupDone={};sessionStart=null;editingLogId=null;save();renderToday()}
+function selectSession(s){currentSession=s;setsDone={};setsData={};warmupDone={};sessionStart=null;editingLogId=null;save();renderToday()}
 
 function exportJSON(){
   const data={state:JSON.parse(localStorage.getItem('train_state')||'{}'),log:JSON.parse(localStorage.getItem('train_log')||'[]'),exported:new Date().toISOString()};
@@ -997,10 +1078,10 @@ document.getElementById('import-input').addEventListener('change',function(e){
       if(data.log) localStorage.setItem('train_log',JSON.stringify(data.log));
       if(data.state){
         localStorage.setItem('train_state',JSON.stringify(data.state));
-        currentPhase=data.state.phase||'p1';
-        currentSession=data.state.session||'Monday';
+        currentPhase=PLAN[data.state.phase]?data.state.phase:'p2';
+        currentSession=PLAN[currentPhase].sessions[data.state.session]?data.state.session:'Session A';
       }
-      setsDone={};warmupDone={};sessionStart=null;
+      setsDone={};setsData={};warmupDone={};sessionStart=null;
       renderToday();renderLog();renderPlan();
       alert('Backup restored successfully.');
     }catch(err){alert('Invalid backup file.');}
